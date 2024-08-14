@@ -1635,7 +1635,245 @@ class SCP_plotter:
         
 
         return fig
-    
+    # ###HYE plots####
+    def HYE_plots(self, data_object,  plot_options, saved_settings, username=None):
+        """_Prepare data for creating intensity volcano plots (two groups)_
+        """
+        group_names = []
+
+        # no compare groups is provided, compare first two
+        for each_key in saved_settings["Order@Conditions"]:
+                group_names.append(each_key)
+
+        # import the data
+        group_dict = {}
+
+        # filter runs into different groups
+        i = 0
+        runname_list = []  # contain list of run names list for each groups
+        for eachGroup in group_names:
+            runname_sublist = saved_settings[eachGroup]["records"]
+
+            group_dict[eachGroup] = self.processor.filter_by_id(
+                data_object,
+                list(runname_sublist))  # prevent the list from being changed
+            runname_list.append(runname_sublist)
+            i += 1
+        # create a dictionary to store the intensity data
+        Intensity_dict = {}
+
+        for eachGroup in group_names:
+            current_condition_data = self.processor.filter_by_missing_values(
+                group_dict[eachGroup])
+            Intensity_dict[eachGroup] = self.processor.NormalizeToMedian(
+                current_condition_data["protein_abundance"],apply_log2=True)
+            
+                
+            
+            # calculate mean, standard deviation, and the number of non-null
+            # elements for each row/protein
+            Intensity_dict[eachGroup][eachGroup+ "_Intensity"] = Intensity_dict[eachGroup].iloc[1:].mean(axis=1)
+            Intensity_dict[eachGroup][eachGroup+ "_stdev"]= Intensity_dict[eachGroup].iloc[1:-1].mean(axis=1)
+            Intensity_dict[eachGroup][eachGroup+ "_count"]= Intensity_dict[eachGroup].iloc[1:-2].shape[1]-Intensity_dict[eachGroup].iloc[1:-2].isna().sum(axis=1)
+            Intensity_dict[eachGroup] = Intensity_dict[eachGroup].loc[:,["Accession",
+                                                                        eachGroup+"_Intensity",
+                                                                        eachGroup+"_stdev",
+                                                                        eachGroup+"_count",
+                                                                        ]]
+            # print(Intensity_dict[eachGroup])
+                
+            """ group1Data
+                    group1_Intensity  group1_stdev  group1_num   Accession
+            0        2.824766e+05  1.708060e+05          15  A0A0B4J2D5
+            1        2.650998e+06  6.259645e+05          15      A2RUR9
+            2        1.973150e+05  5.645698e+04          15      A8MTJ3
+            3        2.524020e+05  1.355699e+05          15      A8MWD9
+            """
+
+        #this is the median for each protein across both groups, you could do a ratio, but this puts it in terms of
+        # allmedian = pd.DataFrame(Intensity_dict[group][group+'_Intensity'] for group in list(Intensity_dict.keys())).median(axis=1,numeric_only=True)
+
+
+        # commonProts=pd.DataFrame()
+        # for eachGroup in group_names:
+        #     these_prots = Intensity_dict[eachGroup].loc[:, ['Accession']]
+
+        #     if commonProts.empty:
+        #         commonProts = these_prots
+        #     # find common proteins
+        #     else:
+        #         commonProts = (commonProts.merge(these_prots, on='Accession', how='inner'))
+        #     # only leave common proteins
+            
+
+        # volcanoData = pd.DataFrame()
+
+        # for eachGroup in group_names:
+        #     # Intensity_dict[eachGroup] = (Intensity_dict[eachGroup].merge(commonProts, on='Accession', how='inner'))
+        #     # print(Intensity_dict[eachGroup])
+        #     # this_median = Intensity_dict[eachGroup][eachGroup+'_Intensity'].median(axis=1,numeric_only =True)  
+        #     # # calculate the ratio between two group median,
+        #     # # will be used to normalize them
+        #     # this_ratio = allmedian / this_median
+
+        #     # merge these two set of data together, adjust groups with ratio to 
+        #     # median of all. 
+            
+        #     # Intensity_dict[eachGroup][eachGroup+"_Intensity"] = Intensity_dict[eachGroup][eachGroup+"_Intensity"] * this_ratio
+        #     if volcanoData.empty:
+        #         volcanoData = Intensity_dict[eachGroup]
+        #     else:
+        #         print(volcanoData)
+        #         volcanoData = pd.merge(volcanoData,Intensity_dict[eachGroup],how="inner")
+
+        
+        fig, box = self.plot_HYE_colored(
+            Intensity_dict,
+            plot_options=plot_options,
+            saved_settings=saved_settings,
+            username=username,
+            data_program=data_object["run_metadata"]["Processing App"][0]
+        )
+        CSV_link = None
+        SVG_link = None
+        # if WRITE_OUTPUT:
+        #     # create the file for donwnload
+        #     img_dir = os.path.join(APPFOLDER, "images/")
+        #     if not os.path.exists(img_dir):
+        #         Path(img_dir).mkdir(parents=True)
+
+        #     fig.write_image(os.path.join(
+        #         img_dir, f"{username}_abundance_volcano_Plot.svg"), format = "svg", validate = False, engine = "kaleido")
+        #     # create the download CSV and its link
+
+        #     data_dir = os.path.join(APPFOLDER, "csv/")
+        #     if not os.path.exists(data_dir):
+        #         Path(data_dir).mkdir(parents=True)
+        #     volcanoData.to_csv(os.path.join(
+        #         data_dir, f"{username}_up_down_regulated_volcano.csv"),
+        #         index=False)
+        #     print("Downloading links...")
+        #     CSV_link = f"/files/{url_base}/csv/" \
+        #         f"{username}_up_down_regulated_volcano.csv"
+
+        #     # download SVG link
+        #     SVG_link = f"/files/{url_base}/images/" \
+        #         f"{username}_abundance_volcano_Plot.svg"
+        
+        return fig, box, CSV_link, SVG_link
+
+
+    def plot_HYE_colored(self,allData_dict,
+                            plot_options=None, 
+                            saved_settings=None,
+                            username=None,
+                            data_program=None):
+        
+        fig = px.scatter(
+            width=plot_options["width"],
+            height=plot_options["height"],)
+        box = px.box(
+            width=plot_options["width"],
+            height=plot_options["height"],
+        )
+        
+        i = 0
+        for each_organism in saved_settings["Order@"+plot_options["Group_By_Color"]]:
+            groups = saved_settings["Order@"+plot_options["Group_By_Y"]]
+            top = groups[0]
+            bottom = groups[1]
+            label = top+"/"+bottom
+        
+            these_groups=[]
+            for each_group in  saved_settings.keys():
+                if ("Order@" not in each_group and
+                    saved_settings[each_group][plot_options["Group_By_Color"]] == each_organism and 
+                    (saved_settings[each_group][plot_options["Group_By_Y"]] == top or saved_settings[each_group][plot_options["Group_By_Y"]] == bottom)):
+                    these_groups.append(each_group)
+                    if saved_settings[each_group][plot_options["Group_By_Y"]]==top:
+                        top_group = each_group
+                        top_intensity = each_group+"_Intensity"
+                    elif saved_settings[each_group][plot_options["Group_By_Y"]]==bottom:
+                        bottom_group = each_group
+                        bottom_intensity = each_group+"_Intensity"
+            
+            x_axis = bottom_intensity
+
+            this_data = pd.DataFrame()
+            for each_group in these_groups:
+                if this_data.empty:
+                    this_data = allData_dict[each_group]
+                else:
+                    this_data = pd.merge(this_data,allData_dict[each_group],how="inner")
+            this_data["organism"] = each_organism
+            this_data["data_program"] = data_program
+
+            if this_data.shape[0] != 0:
+                print(each_organism)
+                print(np.nanmedian(this_data[top_intensity]-this_data[bottom_intensity]),)
+                fig.add_scatter(x=this_data[x_axis],
+                                y=this_data[top_intensity]-this_data[bottom_intensity],
+                                text=this_data["Accession"],
+                                mode="markers", marker=dict(
+                                    color=plot_options["colors"][i]),
+                                name = each_organism)
+                fig.add_hline(y=np.log2(saved_settings[top_group][plot_options["Group_By_Amount"]]/
+                                    saved_settings[bottom_group][plot_options["Group_By_Amount"]]))
+                box.add_box(x=this_data["data_program"],
+                            y=this_data[top_intensity]-this_data[bottom_intensity],
+                            fillcolor=plot_options["colors"][i],
+                            name = each_organism)
+                box.add_hline(y=np.log2(saved_settings[top_group][plot_options["Group_By_Amount"]]/
+                                    saved_settings[bottom_group][plot_options["Group_By_Amount"]]))
+            i = i + 1
+        
+        fig.update_traces(
+                mode="markers",
+                hovertemplate="%{text}<br>x=: %{x}"
+                " <br>y=: %{y}")
+        if plot_options["title"] != "" or plot_options["title"] is not None:
+            plot_title = plot_options["title"] + " " + label
+        else:
+            plot_title = None
+        if not plot_options["xlimits"] or plot_options["xlimits"] == "[]" or \
+                not isinstance(plot_options["xlimits"], list):
+            xlimits = None
+        else:
+            xlimits = plot_options["xlimits"]
+
+        if not plot_options["ylimits"] or plot_options["ylimits"] == "[]" or \
+                not isinstance(plot_options["ylimits"], list):
+            ylimits = None
+        else:
+            ylimits = plot_options["ylimits"]
+
+        fig.update_layout(
+            font=plot_options["font"],
+
+            title=plot_title,
+            xaxis=dict(title=dict(
+                text=plot_options["X Title"]), range=xlimits),
+            yaxis=dict(title=dict(
+                text=plot_options["Y Title"]), range=ylimits),
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+
+        )
+        box.update_layout(
+            font=plot_options["font"],
+
+            title=plot_title,
+            xaxis=dict(title=dict(
+                text=plot_options["X Title"]), range=xlimits),
+            yaxis=dict(title=dict(
+                text=plot_options["Y Title"]), range=ylimits),
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+
+        )
+
+        
+        return fig, box
     # ###Ranked Abundance Plot####
     def Rank_Abundance_Plots(self, data_object,  plot_options, saved_settings, username=None):
         """_Prepare data for creating intensity volcano plots (two groups)_

@@ -1,0 +1,7 @@
+Conditions	filter_in	filter_out	Organism	Amount	Setup
+human a	HYE_A@0	blk	Human	65	A
+human b	HYE_B@0	blk	Human	65	B
+yeast a	HYE_A@1	blk	Yeast	30	A
+yeast b	HYE_B@1	blk	Yeast	15	B
+bacteria a	HYE_A@2	blk	E. Coli	5	A
+bacteria b	HYE_B@2	blk	E. Coli	20	B
