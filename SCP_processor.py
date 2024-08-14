@@ -10,10 +10,11 @@ from scipy.stats import ttest_ind_from_stats
 import json
 
 class SCP_processor:
-    def __init__(self, ignore_peptides = False, ignore_proteins = False) -> None:
-        self.min_unique_peptides = 1
+    def __init__(self, ignore_peptides = False, ignore_proteins = False,min_peptides=1, data_type = "LF") -> None:
+        self.min_unique_peptides = min_peptides
         self.ignore_peptides = ignore_peptides
         self.ignore_proteins = ignore_proteins
+        self.data_type = data_type
 
     def sumIDs(self,IDMatrix):
         """_summarize the ID matrix infor into ID summary_
@@ -21,7 +22,7 @@ class SCP_processor:
 
         Args:
             IDMatrix (_type_): _protein or pepetides matrix_
-            0 Symbol/Annotated Sequence 	run1 	run2 	run3 
+            0 Accession/Annotated Sequence 	run1 	run2 	run3 
             1 P023D12	MS2 	MBR 	NaN 
             2 P1222	NaN 	ID 	NaN 
         ID: means we don't know the ID mode
@@ -36,7 +37,7 @@ class SCP_processor:
         # removes the columns that don't have ID data
         columns = [col for col in IDMatrix.columns if not any(
             substring in col for substring in [
-                'Symbol', 'Annotated Sequence'])]
+                'Accession', 'Annotated Sequence'])]
         runs = list(set(["-".join(x.split("-")[0:2])  for x in columns]))
         # print(runs)
         #put each ID_Modes into a list
@@ -83,8 +84,8 @@ class SCP_processor:
         # make IDs into MBR
         if "Annotated Sequence" in all_matrix.columns:
             name = "Annotated Sequence"
-        elif "Symbol" in all_matrix.columns:  
-            name = "Symbol"
+        elif "Accession" in all_matrix.columns:  
+            name = "Accession"
         id_cols = all_matrix.columns.tolist()
         id_cols.remove(name)
         
@@ -399,7 +400,7 @@ class SCP_processor:
                 peptide_table_MS2 = pd.read_table(input4,low_memory=False)
                 peptide_table_MS2 = peptide_table_MS2.loc[peptide_table_MS2["Protein.Names"].str.endswith("_"+this_organism)]
                 pep_other_info = pd.DataFrame({"Mapped Proteins": peptide_table["Protein.Group"], "Modified.Sequence": peptide_table["Modified.Sequence"]})
-                prot_other_info["Source_File"] = "None"
+                pep_other_info["Source_File"] = "None"
                 peptide_table= peptide_table[~peptide_table['Protein.Group'].str.contains(
                 "contam", na=False)]
                 peptide_table_MS2= peptide_table_MS2[~peptide_table_MS2['Protein.Group'].str.contains(
@@ -458,7 +459,7 @@ class SCP_processor:
                     
                 prot_other_info = pd.DataFrame({"Protein": protein_table["Genes"], "Protein.Group": protein_table["Protein.Group"]})
 
-                pep_other_info["Source_File"] = "None"
+                prot_other_info["Source_File"] = "None"
 
                 # meta_table = pd.read_csv(input5, sep=' ', header=None, names=["File Name"])
                 # filter Contaminant
@@ -555,7 +556,7 @@ class SCP_processor:
 
                 # get ID matrix tables
                 prot_ID = prot_abundance.copy()
-                cols = [col for col in prot_ID.columns if col != 'Symbol']
+                cols = [col for col in prot_ID.columns if col != 'Accession']
                 for col in cols:
                     if prot_ID[col].dtype != 'object': # Check if not a string column
                         prot_ID[col].replace(0, np.nan, inplace=True)
@@ -585,9 +586,9 @@ class SCP_processor:
 
                 # ALL
                 ## Proteins abundance table
-                protein_table.rename(columns={'Gene': 'Symbol'},inplace=True)
+                protein_table.rename(columns={'Gene': 'Accession'},inplace=True)
                 prot_abundance = protein_table.drop(prot_info_columns,axis=1)
-                prot_info_columns.append("Symbol")
+                prot_info_columns.append("Accession")
                 prot_other_info = protein_table.loc[:,prot_info_columns]
                 
             
@@ -622,7 +623,7 @@ class SCP_processor:
 
                 # get ID matrix tables
                 prot_ID = prot_abundance.copy()
-                cols = [col for col in prot_ID.columns if col != 'Symbol']
+                cols = [col for col in prot_ID.columns if col != 'Accession']
                 for col in cols:
                     if prot_ID[col].dtype != 'object': # Check if not a string column
                         prot_ID[col].replace(0, np.nan, inplace=True)
@@ -632,7 +633,7 @@ class SCP_processor:
                 cols = [col for col in pep_ID.columns if col != 'Annotated Sequence	']
             #Rename protein numbers
             
-                cols = [col for col in prot_ID_MS2.columns if col != 'Symbol']
+                cols = [col for col in prot_ID_MS2.columns if col != 'Accession']
                 for col in cols:
                     if prot_ID_MS2[col].dtype != 'object': # Check if not a string column
                         prot_ID_MS2[col].replace(0, np.nan, inplace=True)
@@ -692,7 +693,7 @@ class SCP_processor:
         #     temp_table["pattern"] = temp_table["start"]+temp_table["Experiment"]
         #     new_dict =  dict(zip(temp_table["pattern"] ,run_name_list["Run Identifier"]))
            
-        #     new_dict["Gene names"] = "Symbol"
+        #     new_dict["Gene names"] = "Accession"
         #     new_dict["Sequence"] = "Annotated Sequence"
         #     for item in [pep_ID,prot_ID,prot_other_info,pep_other_info]:
         #         # Generate a new column name mapping using the function
@@ -701,7 +702,7 @@ class SCP_processor:
 
         #     #change column names to file/run names to our fileID
         #     old_dict = dict(zip(temp_table["Experiment"] ,run_name_list["Run Identifier"]))
-        #     old_dict["Gene names"] = "Symbol"
+        #     old_dict["Gene names"] = "Accession"
         #     old_dict["Sequence"] = "Annotated Sequence"
         #     max_channel = 0 
         #     for item in [prot_abundance,pep_abundance]:
@@ -748,7 +749,7 @@ class SCP_processor:
         #             prot_ID = prot_ID.drop(columns=column)
         #     #remove the fake ids (all zeros)
             
-        #     prot_abundance = prot_abundance.set_index("Symbol")
+        #     prot_abundance = prot_abundance.set_index("Accession")
         #     pep_abundance = pep_abundance.set_index("Annotated Sequence")
         #     for run in run_name_list["Run Identifier"].drop_duplicates():
         #         current_channels = run_name_list.loc[run_name_list["Run Identifier"]==run,"Channel Identifier"].tolist()
@@ -761,7 +762,7 @@ class SCP_processor:
         #         nan_ids = prot_abundance[rows_with_all_nan].index
 
         #         # Replace corresponding rows in df1 for the same subset of columns with NaN
-        #         prot_ID.loc[prot_ID['Symbol'].isin(nan_ids), prot_ID.columns.isin(current_channels)] = np.NaN
+        #         prot_ID.loc[prot_ID['Accession'].isin(nan_ids), prot_ID.columns.isin(current_channels)] = np.NaN
 
         #         rows_with_all_nan = pep_abundance[current_channels].isna().all(axis=1)
 
@@ -842,7 +843,7 @@ class SCP_processor:
                 input5= eachGroup["input5"]
 
             for each_organism in organisms:
-                current_data_object = read_file(this_organism=each_organism,input1=input1,input2=input2,
+                current_data_object = self.read_file(this_organism=each_organism,input1=input1,input2=input2,
                                                 input3=input3,input4 = input4,
                                                 input5=input5, process_app=process_app,file_id = i)
                 data_objects.append(current_data_object)
@@ -867,27 +868,27 @@ class SCP_processor:
                 final_data_object = eachDataObject
             else:
                 final_data_object['run_metadata'] = pd.concat([final_data_object['run_metadata'],eachDataObject['run_metadata']]).reset_index(drop=True)
-                if self.ignore_peptides == False:
-                    final_data_object['protein_other_info'] = eachDataObject["protein_abundance"][["Symbol"]]
-                    final_data_object['protein_ID_Summary'] = pd.concat([final_data_object['protein_ID_Summary'],eachDataObject['protein_ID_Summary']]).reset_index(drop=True)
                 if self.ignore_proteins == False:
+                    final_data_object['protein_other_info'] = eachDataObject["protein_abundance"][["Accession"]]
+                    final_data_object['protein_ID_Summary'] = pd.concat([final_data_object['protein_ID_Summary'],eachDataObject['protein_ID_Summary']]).reset_index(drop=True)
+                if self.ignore_peptides == False:
                     final_data_object['peptide_other_info'] = eachDataObject["peptide_abundance"][["Annotated Sequence"]]
                     final_data_object['peptide_ID_Summary'] = pd.concat([final_data_object['peptide_ID_Summary'],eachDataObject['peptide_ID_Summary']]).reset_index(drop=True)
                 duplicates_found = False
                 
                 #loop through to see if there are any duplicate files
                 if self.ignore_proteins == False:
-                    bad_cols = [eachCol for eachCol in final_data_object['protein_abundance'].loc[:, final_data_object['protein_abundance'].columns!='Symbol'].columns]
+                    bad_cols = [eachCol for eachCol in final_data_object['protein_abundance'].loc[:, final_data_object['protein_abundance'].columns!='Accession'].columns if eachCol in eachDataObject["protein_abundance"]]
                     eachDataObject["protein_abundance"] =  eachDataObject["protein_abundance"].drop(bad_cols,axis=1)
                     
-                    bad_cols = [eachCol for eachCol in final_data_object['protein_ID_matrix'].loc[:, final_data_object['protein_ID_matrix'].columns!='Symbol'].columns]
+                    bad_cols = [eachCol for eachCol in final_data_object['protein_ID_matrix'].loc[:, final_data_object['protein_ID_matrix'].columns!='Accession'].columns if eachCol in eachDataObject["protein_ID_matrix"]]
                     eachDataObject["protein_ID_matrix"] =  eachDataObject["protein_ID_matrix"].drop(bad_cols,axis=1)
                     final_data_object['protein_abundance'] = pd.merge(final_data_object['protein_abundance'],eachDataObject['protein_abundance'],how="outer")
                     final_data_object['protein_ID_matrix'] = pd.merge(final_data_object['protein_ID_matrix'],eachDataObject['protein_ID_matrix'],how="outer")
                 if self.ignore_peptides == False:
-                    bad_cols = [eachCol for eachCol in final_data_object['peptide_abundance'].loc[:, final_data_object['peptide_abundance'].columns!='Annotated Sequence'].columns]
+                    bad_cols = [eachCol for eachCol in final_data_object['peptide_abundance'].loc[:, final_data_object['peptide_abundance'].columns!='Annotated Sequence'].columns if eachCol in eachDataObject["peptide_abundance"]]
                     eachDataObject["peptide_abundance"] =  eachDataObject["peptide_ID_matrix"].drop(bad_cols,axis=1)
-                    bad_cols = [eachCol for eachCol in final_data_object['peptide_ID_matrix'].loc[:, final_data_object['peptide_ID_matrix'].columns!='Annotated Sequence'].columns]
+                    bad_cols = [eachCol for eachCol in final_data_object['peptide_ID_matrix'].loc[:, final_data_object['peptide_ID_matrix'].columns!='Annotated Sequence'].columns if eachCol in "peptide_ID_matrix"]
                     eachDataObject["peptide_ID_matrix"] =  eachDataObject["peptide_ID_matrix"].drop(bad_cols,axis=1)
                     final_data_object['peptide_abundance'] = pd.merge(final_data_object['peptide_abundance'],eachDataObject['peptide_abundance'],how="outer")
                     final_data_object['peptide_ID_matrix'] = pd.merge(final_data_object['peptide_ID_matrix'],eachDataObject['peptide_ID_matrix'],how="outer")
@@ -984,13 +985,13 @@ class SCP_processor:
 
         Returns:
             _data_object_: _dictionary containing data for one experimental
-            'abundances':        Symbol  3_TrypsinLysConly_3A4_channel2 3_TrypsinLysConly_3BC_channel1
+            'abundances':        Accession  3_TrypsinLysConly_3A4_channel2 3_TrypsinLysConly_3BC_channel1
     0     A0A096LP49                            0.00                                        10
     1     A0A0B4J2D5                        89850.26                                      3311
     2         A0AVT1                        83055.87                                    312312
         """
         if is_protein:
-            name = "Symbol"
+            name = "Accession"
             matrix_name = "protein_ID_matrix"
             other_info_name = "protein_other_info"
             abundance_name = "protein_abundance"
@@ -1043,13 +1044,13 @@ class SCP_processor:
 
         Returns:
             _data_object_: _dictionary containing data for one experimental
-            'abundances':        Symbol  3_TrypsinLysConly_3A4_channel2 3_TrypsinLysConly_3BC_channel1
+            'abundances':        Accession  3_TrypsinLysConly_3A4_channel2 3_TrypsinLysConly_3BC_channel1
     0     A0A096LP49                            0.00                                        10
     1     A0A0B4J2D5                        89850.26                                      3311
     2         A0AVT1                        83055.87                                    312312
         """
         if is_protein:
-            name = "Symbol"
+            name = "Accession"
             matrix_name = "protein_ID_matrix"
             other_info_name = "protein_other_info"
             abundance_name = "protein_abundance"
@@ -1126,13 +1127,13 @@ class SCP_processor:
 
         Returns:
             _data_object_: _dictionary containing data for one experimental
-            'abundances':        Symbol  3_TrypsinLysConly_3A4_channel2
+            'abundances':        Accession  3_TrypsinLysConly_3A4_channel2
     0     A0A096LP49                            0.00
     1     A0A0B4J2D5                        89850.26
     2         A0AVT1                        83055.87
         """
         if is_protein:
-            name = "Symbol"
+            name = "Accession"
             matrix_name = "protein_ID_matrix"
             other_info_name = "protein_other_info"
             abundance_name = "protein_abundance"
@@ -1198,7 +1199,7 @@ class SCP_processor:
         Returns:
             _type_: _description_
             format:
-            'abundances':        Symbol  3_TrypsinLysConly_3A4_channel2
+            'abundances':        Accession  3_TrypsinLysConly_3A4_channel2
             A0A096LP49                    0.000000e+00
         """
         # all the columns/sample list
@@ -1235,10 +1236,10 @@ class SCP_processor:
             data_object (_type_): _full data frame_
 
         Returns:
-            _type_: _df with Symbol mean, stdev, cv for each protein/peptide_
+            _type_: _df with Accession mean, stdev, cv for each protein/peptide_
         """
-        if 'Symbol' in abundance_data.columns:
-            name = "Symbol"
+        if 'Accession' in abundance_data.columns:
+            name = "Accession"
         if 'Annotated Sequence' in abundance_data.columns:
             name = "Annotated Sequence"
         abundance_data = abundance_data.assign(
@@ -1373,7 +1374,7 @@ class SCP_processor:
 #             _type_: _description_
 #         """
 
-#         # make dict for each runname, no Symbol/sequence
+#         # make dict for each runname, no Accession/sequence
 #         nameDict_channels = dict(zip(data_dict["run_metadata"]["Run Names"],data_dict["run_metadata"]["Channel Identifier"]))
 
 #         nameDict_runs = dict(zip(data_dict["run_metadata"]["Run Names"],data_dict["run_metadata"]["Run Identifier"]))
@@ -1386,8 +1387,8 @@ class SCP_processor:
 
 #         if "Annotated Sequence" in runname_list:
 #             runname_list.remove("Annotated Sequence")
-#         if "Symbol" in runname_list:
-#             runname_list.remove("Symbol")
+#         if "Accession" in runname_list:
+#             runname_list.remove("Accession")
 #         for eachName in runname_list:
 #             run_id_list.append(nameDict_runs[eachName])
 #         for eachName in runname_list:
@@ -1398,8 +1399,8 @@ class SCP_processor:
 
 #         filtered_data = {}
 #     # filtered_data["meta"] = data_dict["meta"]
-#         runname_list.extend(["Annotated Sequence","Symbol"])
-#         identifier_list_plus.extend(["Annotated Sequence","Symbol"])
+#         runname_list.extend(["Annotated Sequence","Accession"])
+#         identifier_list_plus.extend(["Annotated Sequence","Accession"])
 
 #         #filtered_data["run_metadata"] = [item for item in data_dict[
 #         #   "run_metadata"] if item in runname_list]
@@ -1442,9 +1443,12 @@ class SCP_processor:
             _type_: _description_
         """
 
-        # make dict for each runname, no Symbol/sequence
-        nameDict_channels = dict(zip(data_dict["run_metadata"]["Run Identifier"],data_dict["run_metadata"]["Channel Identifier"]))
-        
+        # make dict for each runname, no Accession/sequence
+        if self.data_type == "TMT":
+            nameDict_channels = dict(zip(data_dict["run_metadata"]["Run Identifier"],data_dict["run_metadata"]["Channel Identifier"]))
+        elif self.data_type == "LF":
+            nameDict_channels = dict(zip(data_dict["run_metadata"]["Run Identifier"],data_dict["run_metadata"]["Run Identifier"]))
+
         identifier_list = []
         
         identifier_list_plus = []
@@ -1452,8 +1456,8 @@ class SCP_processor:
 
         if "Annotated Sequence" in run_id_list:
             run_id_list.remove("Annotated Sequence")
-        if "Symbol" in run_id_list:
-            run_id_list.remove("Symbol")
+        if "Accession" in run_id_list:
+            run_id_list.remove("Accession")
         for eachName in run_id_list:
             identifier_list.append(nameDict_channels[eachName])
         for eachName in run_id_list:
@@ -1462,8 +1466,8 @@ class SCP_processor:
 
         filtered_data = {}
     # filtered_data["meta"] = data_dict["meta"]
-        run_id_list.extend(["Annotated Sequence","Symbol"])
-        identifier_list_plus.extend(["Annotated Sequence","Symbol"])
+        run_id_list.extend(["Annotated Sequence","Accession"])
+        identifier_list_plus.extend(["Annotated Sequence","Accession"])
 
         #filtered_data["run_metadata"] = [item for item in data_dict[
         #   "run_metadata"] if item in runname_list]

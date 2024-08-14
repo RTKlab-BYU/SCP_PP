@@ -26,11 +26,12 @@ from SCP_processor import SCP_processor
 
 
 class SCP_plotter:
-    def __init__(self, write_output = False) -> None:
+    def __init__(self, write_output = False, data_type = "LF", processor = SCP_processor()) -> None:
         self.write_output = write_output
         self.app_folder = "./"
-        self.processor = SCP_processor()
+        self.processor = processor
         self.url_base = None
+        self.data_type = data_type
 
 
     def ID_plots(self, data_object, plot_options, saved_settings, username=None):
@@ -81,57 +82,8 @@ class SCP_plotter:
             columns=["Names", "ID_Type", "ID_Mode", "Conditions", "IDs"])
 
         # loop through each group and extract IDs, put them into allIDs table
-        for eachCondition in group_names:
-            # Protein ID summary
-            for index, row in group_dict[eachCondition][
-                    "protein_ID_Summary"].iterrows():
-                for item in ["MS2_IDs",
-                            "MBR_IDs",
-                            "Total_IDs"]:
-                    if not pd.isna(group_dict[eachCondition][
-                            "protein_ID_Summary"].at[index, item]):
-                        # if the row with the item column is not empty,
-                        # add it to allIDs table.
-                        allIDs = pd.concat(
-                            [allIDs,
-                            pd.DataFrame(
-                                [[group_dict[eachCondition][
-                                    "protein_ID_Summary"].at[index, "names"],
-                                "protein",
-                                item,
-                                eachCondition,
-                                group_dict[eachCondition][
-                                    "protein_ID_Summary"].at[index, item]]],
-                                columns=["Names",
-                                        "ID_Type",
-                                        "ID_Mode",
-                                        "Conditions",
-                                        "IDs"])],
-                            ignore_index=True)
-            # Peptide ID summary
-            for index, row in group_dict[eachCondition][
-                    "peptide_ID_Summary"].iterrows():
-                for item in ["MS2_IDs",
-                            "MBR_IDs",
-                            "Total_IDs"]:
-                    if not pd.isna(group_dict[eachCondition][
-                            "peptide_ID_Summary"].at[index, item]):
-                        allIDs = pd.concat(
-                            [allIDs,
-                            pd.DataFrame(
-                                [[group_dict[eachCondition][
-                                    "peptide_ID_Summary"].at[index, "names"],
-                                "peptide",
-                                item,
-                                eachCondition,
-                                group_dict[eachCondition][
-                                    "peptide_ID_Summary"].at[index, item]]],
-                                columns=["Names",
-                                        "ID_Type",
-                                        "ID_Mode",
-                                        "Conditions",
-                                        "IDs"])],
-                            ignore_index=True)
+        
+            
         # ######################allIDs format###################
         # name	ID_Type	ID_Mode	Conditions	IDs
         # file1	peptide	MS2_IDs	experimetn 1	xxxxx
@@ -139,12 +91,67 @@ class SCP_plotter:
         # file3	peptide	Total_IDs	experiment 3	xxx
         #######################################################
         # Calcuate mean, standard deviation and number of replicates for each
-        export_ids = allIDs.copy()
         # choose protein or peptide
         if plot_options["plot_type"] == "1":  # Protein ID
+            for eachCondition in group_names:
+            # Protein ID summary
+                for index, row in group_dict[eachCondition][
+                        "protein_ID_Summary"].iterrows():
+                    for item in ["MS2_IDs",
+                                "MBR_IDs",
+                                "Total_IDs"]:
+                        if not pd.isna(group_dict[eachCondition][
+                                "protein_ID_Summary"].at[index, item]):
+                            # if the row with the item column is not empty,
+                            # add it to allIDs table.
+                            allIDs = pd.concat(
+                                [allIDs,
+                                pd.DataFrame(
+                                    [[group_dict[eachCondition][
+                                        "protein_ID_Summary"].at[index, "names"],
+                                    "protein",
+                                    item,
+                                    eachCondition,
+                                    group_dict[eachCondition][
+                                        "protein_ID_Summary"].at[index, item]]],
+                                    columns=["Names",
+                                            "ID_Type",
+                                            "ID_Mode",
+                                            "Conditions",
+                                            "IDs"])],
+                                ignore_index=True)
             allIDs = allIDs[allIDs["ID_Type"] == "protein"]
+                            
         elif plot_options["plot_type"] == "2":  # Peptide ID
+            # Peptide ID summary
+            for eachCondition in group_names:
+
+                for index, row in group_dict[eachCondition][
+                        "peptide_ID_Summary"].iterrows():
+                    for item in ["MS2_IDs",
+                                "MBR_IDs",
+                                "Total_IDs"]:
+                        if not pd.isna(group_dict[eachCondition][
+                                "peptide_ID_Summary"].at[index, item]):
+                            allIDs = pd.concat(
+                                [allIDs,
+                                pd.DataFrame(
+                                    [[group_dict[eachCondition][
+                                        "peptide_ID_Summary"].at[index, "names"],
+                                    "peptide",
+                                    item,
+                                    eachCondition,
+                                    group_dict[eachCondition][
+                                        "peptide_ID_Summary"].at[index, item]]],
+                                    columns=["Names",
+                                            "ID_Type",
+                                            "ID_Mode",
+                                            "Conditions",
+                                            "IDs"])],
+                                ignore_index=True)
             allIDs = allIDs[allIDs["ID_Type"] == "peptide"]
+                        
+        export_ids = allIDs.copy()
 
         # choose total, MS2 or stacked
         if plot_options["ID mode"] == "MS2":  # MS2 ID
@@ -558,7 +565,7 @@ class SCP_plotter:
         # allIDs table will be used to store all experiment name, ID types (
         # protein, peptide, MS2 and MS1 based), conditions and IDs numbers
         allProteins = pd.DataFrame(
-            columns=["Symbol", "Missing Values Rate","Conditions"])
+            columns=["Accession", "Missing Values Rate","Conditions"])
         allPeptides = pd.DataFrame(
             columns=["Annotated Sequence", "Missing Values Rate","Conditions"])
         # loop through each group and extract IDs, put them into allIDs table
@@ -585,7 +592,7 @@ class SCP_plotter:
         # choose protein or peptide
         if plot_options["plot_type"] == "1":  # Protein ID
             allIDs = allProteins
-            name = "Symbol"
+            name = "Accession"
         elif plot_options["plot_type"] == "2":  # Peptide ID
             allIDs = allPeptides
             name = "Annotated Sequence"
@@ -992,7 +999,7 @@ class SCP_plotter:
 
 
         # ######################all_CVs format###################
-    #      Symbol     intensity          stdev          CV   Conditions
+    #      Accession     intensity          stdev          CV   Conditions
     # 0       A6NHR9  3.248547e+06  672989.819300   20.716643    DDMandDTT
     # 1       A8MTJ3  5.031539e+05  195535.383583   38.861944    DDMandDTT
     # 2       E9PAV3  5.330290e+05  161385.491163   30.277056    DDMandDT
@@ -1214,11 +1221,11 @@ class SCP_plotter:
             i += 1
         
         labels_set = ["Inclusion List"]
-        Inclusion_List = pd.read_table(plot_options["inclusion list"],sep=",")["Symbol"].to_list()
+        Inclusion_List = pd.read_table(plot_options["inclusion list"],sep=",")["Accession"].to_list()
         data_set = [set(Inclusion_List)]
         if plot_options["plot_type"] == 1:
             matrix_name = "protein_abundance"
-            molecule_name = "Symbol"
+            molecule_name = "Accession"
             is_protein = True
         elif plot_options["plot_type"] == 2:
             matrix_name = "peptide_abundance"
@@ -1263,7 +1270,7 @@ class SCP_plotter:
                 Path(data_dir).mkdir(parents=True)
             i = 0
             for eachSet in data_set:
-                pd.DataFrame({"Symbol": list(eachSet)}).to_csv(os.path.join(
+                pd.DataFrame({"Accession": list(eachSet)}).to_csv(os.path.join(
                     data_dir, f"{username}_{labels_set[i]}_Venn.csv"), index=False)
                 i = i + 1
         
@@ -1442,7 +1449,7 @@ class SCP_plotter:
         labels_set = []
         if plot_options["plot_type"] == 1:
             matrix_name = "protein_abundance"
-            molecule_name = "Symbol"
+            molecule_name = "Accession"
             is_protein = True
         elif plot_options["plot_type"] == 2:
             matrix_name = "peptide_abundance"
@@ -1487,7 +1494,7 @@ class SCP_plotter:
                 Path(data_dir).mkdir(parents=True)
             i = 0
             for eachSet in data_set:
-                pd.DataFrame({"Symbol": list(eachSet)}).to_csv(os.path.join(
+                pd.DataFrame({"Accession": list(eachSet)}).to_csv(os.path.join(
                     data_dir, f"{username}_{labels_set[i]}_Venn.csv"), index=False)
                 i = i + 1
         
@@ -1887,8 +1894,8 @@ class SCP_plotter:
         
         ref_data = self.processor.filter_by_id(data_object,list(run_ids))["protein_abundance"]
         ref_data["average_intensity"] = ref_data.mean(axis=1)
-        ref_data = ref_data.sort_values(by="average_intensity",ascending = False).drop_duplicates(subset='Symbol', keep='first').dropna().reset_index()
-        ranked_proteins = pd.DataFrame({"Symbol": ref_data["Symbol"],
+        ref_data = ref_data.sort_values(by="average_intensity",ascending = False).drop_duplicates(subset='Accession', keep='first').dropna().reset_index()
+        ranked_proteins = pd.DataFrame({"Accession": ref_data["Accession"],
                                         "Rank": ref_data.index})
 
         # no compare groups is provided, compare first two
@@ -1926,7 +1933,7 @@ class SCP_plotter:
             
         
         """ group1Data
-                group1_Intensity  group1_stdev  group1_num   Symbol
+                group1_Intensity  group1_stdev  group1_num   Accession
         0        2.824766e+05  1.708060e+05          15  A0A0B4J2D5
         1        2.650998e+06  6.259645e+05          15      A2RUR9
         2        1.973150e+05  5.645698e+04          15      A8MTJ3
@@ -1975,7 +1982,7 @@ class SCP_plotter:
                 fig.add_scatter(name=eachCondition,
                                 x=allData[eachCondition]["Rank"],
                                 y=allData[eachCondition]["Average Reporter Ion Intensity"],
-                                text=allData[eachCondition]["Symbol"],
+                                text=allData[eachCondition]["Accession"],
                                 mode="markers", 
                                 marker_color = plot_options["color"][i])
             i = i + 1
@@ -2054,18 +2061,18 @@ class SCP_plotter:
         # elements for each row/protein
         group1Data = (Intensity_dict[group1]
                     .assign(**{group1+'_Intensity': Intensity_dict[group1].drop(
-            columns=['Symbol']).mean(axis=1),
+            columns=['Accession']).mean(axis=1),
             "group1_stdev":Intensity_dict[group1].drop(
-                        columns=['Symbol']).std(axis=1),
+                        columns=['Accession']).std(axis=1),
             "group1_num":Intensity_dict[group1].drop(
-                        columns=['Symbol']).shape[1] - Intensity_dict[
+                        columns=['Accession']).shape[1] - Intensity_dict[
                         group1].isna().sum(axis=1)})
                     .loc[:, [group1+'_Intensity',
                             'group1_stdev',
                             'group1_num',
-                            'Symbol']])
+                            'Accession']])
         """ group1Data
-                group1_Intensity  group1_stdev  group1_num   Symbol
+                group1_Intensity  group1_stdev  group1_num   Accession
         0        2.824766e+05  1.708060e+05          15  A0A0B4J2D5
         1        2.650998e+06  6.259645e+05          15      A2RUR9
         2        1.973150e+05  5.645698e+04          15      A8MTJ3
@@ -2073,26 +2080,26 @@ class SCP_plotter:
         """
         group2Data = (Intensity_dict[group2]
                     .assign(**{group2+'_Intensity': Intensity_dict[group2].drop(
-            columns=['Symbol']).mean(axis=1),
+            columns=['Accession']).mean(axis=1),
             "group2_stdev":Intensity_dict[group2].drop(
-                        columns=['Symbol']).std(axis=1),
+                        columns=['Accession']).std(axis=1),
             "group2_num":Intensity_dict[group2].drop(
-                        columns=['Symbol']).shape[1] - Intensity_dict[
+                        columns=['Accession']).shape[1] - Intensity_dict[
                         group2].isna().sum(axis=1)})
                     .loc[:, [group2+'_Intensity',
                             'group2_stdev',
                             'group2_num',
-                            'Symbol']])
+                            'Accession']])
         # find common proteins
-        commonProts = group1Data[group1Data['Symbol'].isin(group2Data['Symbol'])].drop_duplicates().loc[:,"Symbol"]
+        commonProts = group1Data[group1Data['Accession'].isin(group2Data['Accession'])].drop_duplicates().loc[:,"Accession"]
         print(commonProts.shape)
         print(group1Data.shape)
         print(group2Data.shape)
 
 
         # only leave common proteins
-        group2Data = group2Data[group2Data['Symbol'].isin(commonProts)].drop_duplicates()
-        group1Data = group1Data[group1Data['Symbol'].isin(commonProts)].drop_duplicates()
+        group2Data = group2Data[group2Data['Accession'].isin(commonProts)].drop_duplicates()
+        group1Data = group1Data[group1Data['Accession'].isin(commonProts)].drop_duplicates()
         print(group1Data.shape)
         print(group2Data.shape)
 
@@ -2119,7 +2126,7 @@ class SCP_plotter:
             print(group1Data.columns)
             print(commonProts)
             volcanoData = (group2Data
-                        .merge(group1Data, on='Symbol', how='inner'))
+                        .merge(group1Data, on='Accession', how='inner'))
 
             volcanoData = (volcanoData
                         .assign(**{group1+'_Intensity':lambda x: volcanoData[
@@ -2218,19 +2225,19 @@ class SCP_plotter:
         if allData.shape[0] != 0:
             fig.add_scatter(x=np.log2(allData[right]/allData[left]),
                             y=-np.log10(allData["benjamini"]),
-                            text=allData["Symbol"],
+                            text=allData["Accession"],
                             mode="markers", marker=dict(
                                 color=plot_options["all color"],size=20))
         if downData.shape[0] != 0:
             fig.add_scatter(x=np.log2(downData[right]/downData[left]),
                             y=-np.log10(downData["benjamini"]),
-                            text=downData["Symbol"],
+                            text=downData["Accession"],
                             mode="markers",
                             marker=dict(color=plot_options["down color"],size=20))
         if upData.shape[0] != 0:
             fig.add_scatter(x=np.log2(upData[right]/upData[left]),
                             y=-np.log10(upData["benjamini"]),
-                            text=upData["Symbol"],
+                            text=upData["Accession"],
                             mode="markers",
                             marker=dict(color=plot_options["up color"],size=20))
             fig.update_traces(
@@ -2315,14 +2322,17 @@ class SCP_plotter:
                 group_dict[eachGroup])
             normalized_data = self.processor.NormalizeToMedian(
                 current_condition_data["protein_abundance"],apply_log2=False)
-            toFileDict = dict(zip(data_object["run_metadata"]["Channel Identifier"],data_object["run_metadata"]["Run Names"]))
+            if self.data_type == "TMT":
+                toFileDict = dict(zip(data_object["run_metadata"]["Channel Identifier"],data_object["run_metadata"]["Run Names"]))
+            elif self.data_type == "LF":
+                toFileDict = dict(zip(data_object["run_metadata"]["Run Identifier"],data_object["run_metadata"]["Run Names"]))
             toFileDict = self.processor.generate_column_to_name_mapping(normalized_data.columns, toFileDict)
             normalized_data.rename(columns = toFileDict,inplace=True)
 
             combined_infodata= pd.concat([combined_infodata, pd.DataFrame({
                 "Sample_Groups": normalized_data
                 .drop(
-                    "Symbol", axis=1).rename(columns = toFileDict).columns,
+                    "Accession", axis=1).rename(columns = toFileDict).columns,
                 "Type": eachGroup})])
             
             '''for x in range(len(list(combined_infodata["Sample_Groups"]))):
@@ -2340,19 +2350,19 @@ class SCP_plotter:
         quant_names = group_names
         while "Annotated Sequence" in quant_names:
             quant_names.remove("Annotated Sequence")
-        while "Symbol" in quant_names:
-            quant_names.remove("Symbol")
+        while "Accession" in quant_names:
+            quant_names.remove("Accession")
 
         while "Annotated Sequence" in all_runs:
             all_runs.remove("Annotated Sequence")
-        while "Symbol" in all_runs:
-            all_runs.remove("Symbol")
+        while "Accession" in all_runs:
+            all_runs.remove("Accession")
 
-        for n in range(len(quant_names)-2): #-2 because not Symbol and Annotated Sequence 
+        for n in range(len(quant_names)-2): #-2 because not Accession and Annotated Sequence 
             if "Annotated Sequence" in runname_list[n]:
                 runname_list[n].remove("Annotated Sequence")
-            if "Symbol" in runname_list[n]:
-                runname_list[n].remove("Symbol")
+            if "Accession" in runname_list[n]:
+                runname_list[n].remove("Accession")
             
             magicNum =np.nanmedian(combined_pcaData[runname_list[
                 n]].dropna(how='all').to_numpy()) /\
@@ -2407,10 +2417,10 @@ class SCP_plotter:
                         y='PC2',
                         color="Type",
                         text="Sample_Groups",
-                        symbol="Type",
+                        Accession="Type",
                         color_discrete_sequence=plot_options["color"],
 
-                        symbol_sequence=plot_options["symbol"],
+                        Accession_sequence=plot_options["Accession"],
                         size_max=30,
                         labels={'PC1': f'PC1 ({round(exp_var_pca[0]*100,2)}%)',
                                 'PC2': f'PC2 ({round(exp_var_pca[1]*100,2)}%)',
@@ -2494,15 +2504,19 @@ class SCP_plotter:
                 group_dict[eachGroup])
             normalized_data = self.processor.NormalizeToMedian(
                 current_condition_data["protein_abundance"],apply_log2=False) #apply this later
-            toFileDict = dict(zip(data_object["run_metadata"]["Channel Identifier"],
+            if self.data_type == "TMT":
+                toFileDict = dict(zip(data_object["run_metadata"]["Channel Identifier"],
                                 [eachGroup + "_#" + str(i) for i in range(len(data_object["run_metadata"]["Channel Identifier"]))]))
+            elif self.data_type == "LF":
+                toFileDict = dict(zip(data_object["run_metadata"]["Run Identifier"],
+                                [eachGroup + "_#" + str(i) for i in range(len(data_object["run_metadata"]["Run Identifier"]))]))
             toFileDict = self.processor.generate_column_to_name_mapping(normalized_data.columns, toFileDict)
             normalized_data.rename(columns = toFileDict,inplace=True)
 
             combined_infodata= pd.concat([combined_infodata, pd.DataFrame({
                 "Sample_Groups": normalized_data
                 .drop(
-                    "Symbol", axis=1).rename(columns = toFileDict).columns,
+                    "Accession", axis=1).rename(columns = toFileDict).columns,
                 "Type": eachGroup})])
             
             '''for x in range(len(list(combined_infodata["Sample_Groups"]))):
@@ -2520,19 +2534,19 @@ class SCP_plotter:
         quant_names = group_names
         while "Annotated Sequence" in quant_names:
             quant_names.remove("Annotated Sequence")
-        while "Symbol" in quant_names:
-            quant_names.remove("Symbol")
+        while "Accession" in quant_names:
+            quant_names.remove("Accession")
 
         while "Annotated Sequence" in all_runs:
             all_runs.remove("Annotated Sequence")
-        while "Symbol" in all_runs:
-            all_runs.remove("Symbol")
+        while "Accession" in all_runs:
+            all_runs.remove("Accession")
 
-        for n in range(len(quant_names)-2): #-2 because not Symbol and Annotated Sequence 
+        for n in range(len(quant_names)-2): #-2 because not Accession and Annotated Sequence 
             if "Annotated Sequence" in runname_list[n]:
                 runname_list[n].remove("Annotated Sequence")
-            if "Symbol" in runname_list[n]:
-                runname_list[n].remove("Symbol")
+            if "Accession" in runname_list[n]:
+                runname_list[n].remove("Accession")
             
             magicNum =np.nanmedian(combined_heatmap_data[runname_list[
                 n]].dropna(how='all').to_numpy()) /\
@@ -2559,19 +2573,19 @@ class SCP_plotter:
             renamed_data.columns = new_names
             # display(combined_heatmap_data)
             long_data = pd.wide_to_long(renamed_data.reset_index(),
-                                        stubnames="Intensity",i="Symbol",j="Sample",suffix=".*").reset_index()
+                                        stubnames="Intensity",i="Accession",j="Sample",suffix=".*").reset_index()
             
             # if plot_options["agg_groups"]:
-            #     # long_data= long_data.groupby(["Symbol", "Group"]).agg({"Intensity": "mean"}).reset_index()
+            #     # long_data= long_data.groupby(["Accession", "Group"]).agg({"Intensity": "mean"}).reset_index()
 
             #     # display(long_data)
             #     index = "Group"
-            #     pivoted_data =  long_data.pivot(index=index,columns="Symbol", values = "Intensity").reset_index()
+            #     pivoted_data =  long_data.pivot(index=index,columns="Accession", values = "Intensity").reset_index()
             # else:
             #     index = "Sample"
-            pivoted_data =  long_data.pivot(index="Sample",columns="Symbol", values = "Intensity").reset_index()
+            pivoted_data =  long_data.pivot(index="Sample",columns="Accession", values = "Intensity").reset_index()
             pivoted_data["Group"] = pivoted_data["Sample"].str.replace("_#.*","",regex=True)
-            # new_cols = combined_heatmap_data.columns.drop("Symbol")
+            # new_cols = combined_heatmap_data.columns.drop("Accession")
             # display(pivoted_data)
             pvalues = []
             means = []
@@ -2629,7 +2643,7 @@ class SCP_plotter:
                         j = j + 1
                     combined_heatmap_data[eachGroup] = current
                 else:
-                    print("ERROR: don't use group names that are also Symbol numbers")
+                    print("ERROR: don't use group names that are also Accession numbers")
                 i = i + 1
 
             data_dir = os.path.join(self.app_folder, "csv/")
@@ -2647,10 +2661,10 @@ class SCP_plotter:
             combined_heatmap_data = combined_heatmap_data.drop(columns=["significant","adjusted_p_values","fold_changes"]+group_names)
 
         if plot_options["log2_transform"]:
-            for eachCol in combined_heatmap_data.columns.drop("Symbol"):
+            for eachCol in combined_heatmap_data.columns.drop("Accession"):
                 combined_heatmap_data[eachCol] = np.log2(combined_heatmap_data[eachCol])
 
-        figure = px.imshow(combined_heatmap_data.set_index("Symbol").dropna(), aspect="auto")
+        figure = px.imshow(combined_heatmap_data.set_index("Accession").dropna(), aspect="auto")
         CSV_link = None
         SVG_link = None
         return figure, CSV_link, SVG_link 
