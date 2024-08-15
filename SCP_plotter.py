@@ -2321,7 +2321,7 @@ class SCP_plotter:
             current_condition_data = self.processor.filter_by_missing_values(
                 group_dict[eachGroup])
             normalized_data = self.processor.NormalizeToMedian(
-                current_condition_data["protein_abundance"],apply_log2=False)
+                current_condition_data["protein_abundance"],apply_log2=True)
             if self.data_type == "TMT":
                 toFileDict = dict(zip(data_object["run_metadata"]["Channel Identifier"],data_object["run_metadata"]["Run Names"]))
             elif self.data_type == "LF":
@@ -2358,18 +2358,20 @@ class SCP_plotter:
         while "Accession" in all_runs:
             all_runs.remove("Accession")
 
+        # print(combined_pcaData.columns)
+        # print(all_runs)
+        # print(runname_list)
+        # print(combined_pcaData[runname_list[0]].columns)
+        # print(combined_pcaData[all_runs].columns)
         for n in range(len(quant_names)-2): #-2 because not Accession and Annotated Sequence 
             if "Annotated Sequence" in runname_list[n]:
                 runname_list[n].remove("Annotated Sequence")
             if "Accession" in runname_list[n]:
                 runname_list[n].remove("Accession")
             
-            magicNum =np.nanmedian(combined_pcaData[runname_list[
-                n]].dropna(how='all').to_numpy()) /\
-                    np.nanmedian(combined_pcaData[
-                all_runs].dropna(how='all').to_numpy()) 
-            for col in combined_pcaData[runname_list[
-                    n]].columns:
+            magicNum =np.nanmedian(combined_pcaData[runname_list[n]].dropna(how='all').to_numpy()
+                                   ) /np.nanmedian(combined_pcaData[all_runs].dropna(how='all').to_numpy()) 
+            for col in combined_pcaData[runname_list[n]].columns:
                 combined_pcaData[col] = combined_pcaData[col]/magicNum
 
 
@@ -2417,10 +2419,10 @@ class SCP_plotter:
                         y='PC2',
                         color="Type",
                         text="Sample_Groups",
-                        Accession="Type",
+                        symbol="Type",
                         color_discrete_sequence=plot_options["color"],
 
-                        Accession_sequence=plot_options["Accession"],
+                        symbol_sequence=plot_options["symbol"],
                         size_max=30,
                         labels={'PC1': f'PC1 ({round(exp_var_pca[0]*100,2)}%)',
                                 'PC2': f'PC2 ({round(exp_var_pca[1]*100,2)}%)',

@@ -33,25 +33,44 @@ class SCP_processor:
     0            10ng_QC_1_channel2 Intensity      NaN      NaN       3650
     1            10ng_QC_2_channel1 Intensity      NaN      NaN       3604
     ....
-        """
-        # removes the columns that don't have ID data
-        columns = [col for col in IDMatrix.columns if not any(
-            substring in col for substring in [
-                'Accession', 'Annotated Sequence'])]
-        runs = list(set(["-".join(x.split("-")[0:2])  for x in columns]))
-        # print(runs)
-        #put each ID_Modes into a list
-        MS2_ID = []
-        MBR_ID = []
-        total_ID = []
-        for eachRun in runs:
-            currentMatrix = IDMatrix.loc[:,IDMatrix.columns.str.contains(eachRun+"-")]
-            MS2_ID.append(len(currentMatrix[currentMatrix.isin(["MS2"]).any(axis=1)])) #PD differentiates
-            MBR_ID.append(len(currentMatrix[currentMatrix.isin(["MBR"]).any(axis=1)])) #PD differentiates
-            total_ID_each = len(currentMatrix[currentMatrix.isin(["ID"]).any(axis=1)]) #some don't so we count total directly
-            if total_ID_each == 0: #otherwise we sum
-                total_ID_each = len(currentMatrix[currentMatrix.isin(["MS2"]).any(axis=1)]) + len(currentMatrix[currentMatrix.isin(["MBR"]).any(axis=1)])
-            total_ID.append(total_ID_each)
+            """
+        if self.data_type == "TMT":
+            # removes the columns that don't have ID data
+            columns = [col for col in IDMatrix.columns if not any(
+                substring in col for substring in [
+                    'Accession', 'Annotated Sequence'])]
+            runs = list(set(["-".join(x.split("-")[0:2])  for x in columns]))
+            # print(runs)
+            #put each ID_Modes into a list
+            MS2_ID = []
+            MBR_ID = []
+            total_ID = []
+            for eachRun in runs:
+                currentMatrix = IDMatrix.loc[:,IDMatrix.columns.str.contains(eachRun+"-")]
+                MS2_ID.append(len(currentMatrix[currentMatrix.isin(["MS2"]).any(axis=1)])) #PD differentiates
+                MBR_ID.append(len(currentMatrix[currentMatrix.isin(["MBR"]).any(axis=1)])) #PD differentiates
+                total_ID_each = len(currentMatrix[currentMatrix.isin(["ID"]).any(axis=1)]) #some don't so we count total directly
+                if total_ID_each == 0: #otherwise we sum
+                    total_ID_each = len(currentMatrix[currentMatrix.isin(["MS2"]).any(axis=1)]) + len(currentMatrix[currentMatrix.isin(["MBR"]).any(axis=1)])
+                total_ID.append(total_ID_each)
+        else:
+            runs = [col for col in IDMatrix.columns if not any(
+                substring in col for substring in [
+                    'Accession', 'Annotated Sequence'])]
+            #put each ID_Modes into a list
+            returnNames = []
+            MS2_ID = []
+            MBR_ID = []
+            total_ID = []
+            for eachColumn in runs:
+                MS2_ID.append(len(IDMatrix[eachColumn][IDMatrix[eachColumn] == "MS2"])) #PD differentiates
+                MBR_ID.append(len(IDMatrix[eachColumn][IDMatrix[eachColumn] == "MBR"])) #PD differentiates
+                total_ID_each = len(IDMatrix[eachColumn][IDMatrix[eachColumn] == "ID"]) #some don't so we count total directly
+                if total_ID_each == 0: #otherwise we sum
+                    total_ID_each = len(IDMatrix[eachColumn][
+                        IDMatrix[eachColumn] == "MS2"]) + len(IDMatrix[
+                        eachColumn][IDMatrix[eachColumn] == "MBR"])
+                total_ID.append(total_ID_each)
 
         return pd.DataFrame({'names': runs,
                             'MS2_IDs': MS2_ID,
@@ -505,14 +524,14 @@ class SCP_processor:
                     if prot_ID[col].dtype != 'object': # Check if not a string column
                         prot_ID[col].replace(0, np.nan, inplace=True)
                         # Replace all numerical values to ID
-                        prot_ID[col] = prot_ID[col].astype(str).str.replace("\d+\.\d+", "ID", regex=True)
+                        prot_ID[col] = prot_ID[col].astype(str).str.replace("\d+\.*\d+", "ID", regex=True)
                 prot_ID_MS2 = prot_abundance_MS2.copy()
                 cols = [col for col in prot_ID_MS2.columns if col != 'Accession']
                 for col in cols:
                     if prot_ID_MS2[col].dtype != 'object': # Check if not a string column
                         prot_ID_MS2[col].replace(0, np.nan, inplace=True)
                         # Replace all numerical values to ID
-                        prot_ID_MS2[col] = prot_ID_MS2[col].astype(str).str.replace("\d+\.\d+", "MS2", regex=True)
+                        prot_ID_MS2[col] = prot_ID_MS2[col].astype(str).str.replace("\d+\.*\d+", "MS2", regex=True)
 
                 prot_ID = self.combine_IDs(prot_ID, prot_ID_MS2)       
             

@@ -1,2 +1,4 @@
-input/.
-__pycache__/.
+input/*
+csv/*
+images/*
+__pycache__/*
