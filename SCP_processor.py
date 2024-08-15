@@ -417,7 +417,8 @@ class SCP_processor:
                 if this_organism != None:
                     peptide_table = peptide_table.loc[peptide_table["Protein.Names"].str.endswith("_"+this_organism)]
                 peptide_table_MS2 = pd.read_table(input4,low_memory=False)
-                peptide_table_MS2 = peptide_table_MS2.loc[peptide_table_MS2["Protein.Names"].str.endswith("_"+this_organism)]
+                if this_organism != None:
+                    peptide_table_MS2 = peptide_table_MS2.loc[peptide_table_MS2["Protein.Names"].str.endswith("_"+this_organism)]
                 pep_other_info = pd.DataFrame({"Mapped Proteins": peptide_table["Protein.Group"], "Modified.Sequence": peptide_table["Modified.Sequence"]})
                 pep_other_info["Source_File"] = "None"
                 peptide_table= peptide_table[~peptide_table['Protein.Group'].str.contains(
@@ -440,9 +441,11 @@ class SCP_processor:
                 pep_abundance_MS2 = peptide_table_MS2.loc[:, peptide_path_cols]
                 # Rename Columns to remove file path
                 file_path_cols = peptide_table.filter(regex='\\\\').columns
-                pep_abundance.columns = [os.path.splitext(os.path.basename(x))[0]+"_"+this_organism if x in file_path_cols else x for x in pep_abundance.columns]
+                if this_organism != None:
+                    pep_abundance.columns = [os.path.splitext(os.path.basename(x))[0]+"_"+this_organism if x in file_path_cols else x for x in pep_abundance.columns]
                 pep_abundance = pep_abundance.rename(columns={'Modified.Sequence': 'Annotated Sequence'})
-                pep_abundance_MS2.columns = [os.path.splitext(os.path.basename(x))[0]+"_"+this_organism if x in file_path_cols else x for x in pep_abundance_MS2.columns]
+                if this_organism != None:
+                    pep_abundance_MS2.columns = [os.path.splitext(os.path.basename(x))[0]+"_"+this_organism if x in file_path_cols else x for x in pep_abundance_MS2.columns]
                 pep_abundance_MS2 = pep_abundance_MS2.rename(columns={'Modified.Sequence': 'Annotated Sequence'})
 
                 run_name_list = pd.DataFrame(data={"Run Names": [os.path.splitext(os.path.basename(x))[0] for x in file_path_cols]})
@@ -472,9 +475,11 @@ class SCP_processor:
 
             if self.ignore_proteins == False:
                 protein_table = pd.read_table(input1,low_memory=False)
-                protein_table = protein_table.loc[protein_table["Protein.Names"].str.endswith("_"+this_organism)]
+                if this_organism != None:
+                    protein_table = protein_table.loc[protein_table["Protein.Names"].str.endswith("_"+this_organism)]
                 protein_table_MS2 = pd.read_table(input3,low_memory=False)
-                protein_table_MS2 = protein_table_MS2.loc[protein_table_MS2["Protein.Names"].str.endswith("_"+this_organism)]
+                if this_organism != None:
+                    protein_table_MS2 = protein_table_MS2.loc[protein_table_MS2["Protein.Names"].str.endswith("_"+this_organism)]
                     
                 prot_other_info = pd.DataFrame({"Protein": protein_table["Genes"], "Protein.Group": protein_table["Protein.Group"]})
 
