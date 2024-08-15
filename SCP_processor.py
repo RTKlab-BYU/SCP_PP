@@ -4,7 +4,6 @@ from sklearn.impute import KNNImputer
 import numpy as np
 import pandas as pd
 import re
-import numpy as np
 from pandas.api.types import is_numeric_dtype
 from scipy.stats import ttest_ind_from_stats
 import json
@@ -1086,7 +1085,7 @@ class SCP_processor:
             abundance_name = "peptide_abundance"
 
         #initializes number of missing values to zero
-        protein_columns = data_object[matrix_name].assign(missingValues=0)
+        protein_columns = data_object[matrix_name].copy().assign(missingValues=0)
 
         i = 0
         # found all the proteins/peptides with missing values rate below
@@ -1112,16 +1111,24 @@ class SCP_processor:
         protein_columns = protein_columns.query(
             "missingValuesRate < @missing_value_thresh")
         
-        protein_columns = protein_columns.loc[:,
-                                    protein_columns.columns.str.contains(name)]
+        data_object[abundance_name] = data_object[abundance_name].loc[data_object[abundance_name][name].isin (protein_columns[name].tolist())]
+        data_object[matrix_name] = data_object[matrix_name].loc[data_object[matrix_name][name].isin (protein_columns[name].tolist())]
+        data_object[other_info_name] = data_object[other_info_name].loc[data_object[other_info_name][name].isin( protein_columns[name].tolist())]
 
-        # filter the data_object with the remaining proteins/peptides names
-        data_object[abundance_name] = protein_columns.merge(
-            data_object[abundance_name])
-        data_object[matrix_name] = protein_columns.merge(
-            data_object[matrix_name])
-        data_object[other_info_name] = protein_columns.merge(
-            data_object[other_info_name])
+        # print(data_object[abundance_name])
+
+        # protein_columns = protein_columns.loc[:,
+        #                             protein_columns.columns.str.contains(name)]
+        # protein_columns= protein_columns.dropna().drop_duplicates()
+        # print(protein_columns)
+        
+        # # filter the data_object with the remaining proteins/peptides names
+        # data_object[abundance_name] = protein_columns.merge(
+        #     data_object[abundance_name],how='inner')
+        # data_object[matrix_name] = protein_columns.merge(
+        #     data_object[matrix_name], how = "inner")
+        # data_object[other_info_name] = protein_columns.merge(
+        #     data_object[other_info_name], how = "inner")
         # In case there is mismatch between ID table and abundance table,
         # mannually remove the row with all NaN values
         # keep rows in data_object[abundance_name] where at least two values are 
@@ -1168,8 +1175,9 @@ class SCP_processor:
             other_info_name = "peptide_other_info"
             abundance_name = "peptide_abundance"
 
-        protein_columns = data_object[matrix_name].assign(missingValues=0)
-
+        protein_columns = data_object[matrix_name].copy()
+        protein_columns["missingValues"] = 0
+        print(data_object[matrix_name].shape)
         i = 0
         # found all the proteins/peptides with missing values rate below
         # the threshold, pep_columns contains the remaining protein/peptide
@@ -1188,25 +1196,33 @@ class SCP_processor:
         protein_columns = protein_columns.query(
             "missingValuesRate < @missing_value_thresh")
         
-        protein_columns = protein_columns.loc[:,
-                                    protein_columns.columns.str.contains(name)]
+        data_object[abundance_name] = data_object[abundance_name].loc[data_object[abundance_name][name].isin (protein_columns[name].tolist())]
+        data_object[matrix_name] = data_object[matrix_name].loc[data_object[matrix_name][name].isin (protein_columns[name].tolist())]
+        data_object[other_info_name] = data_object[other_info_name].loc[data_object[other_info_name][name].isin( protein_columns[name].tolist())]
 
-        # filter the data_object with the remaining proteins/peptides names
-        data_object[abundance_name] = protein_columns.merge(
-            data_object[abundance_name])
-        data_object[matrix_name] = protein_columns.merge(
-            data_object[matrix_name])
-        data_object[other_info_name] = protein_columns.merge(
-            data_object[other_info_name])
-        # In case there is mismatch between ID table and abundance table,
-        # mannually remove the row with all NaN values
-        # keep rows in data_object[abundance_name] where at least two values are 
-        # not NaN(do this to all rows except the first row), otherwise can't
-        # calculate the stdev
+        # print(data_object[abundance_name])
+        # protein_columns = protein_columns.loc[:,
+        #                             protein_columns.columns.str.contains(name)]
+        # protein_columns= protein_columns.dropna().drop_duplicates()
+        # print(protein_columns)
+        
+        # # filter the data_object with the remaining proteins/peptides names
+        # data_object[abundance_name] = protein_columns.merge(
+        #     data_object[abundance_name], how = "inner")
+        # data_object[matrix_name] = protein_columns.merge(
+        #     data_object[matrix_name], how = "inner")
+        # data_object[other_info_name] = protein_columns.merge(
+        #     data_object[other_info_name], how = "inner")
+        # # In case there is mismatch between ID table and abundance table,
+        # # mannually remove the row with all NaN values
+        # # keep rows in data_object[abundance_name] where at least two values are 
+        # # not NaN(do this to all rows except the first row), otherwise can't
+        # # calculate the stdev
         if ignore_nan:
             data_object[abundance_name] = data_object[abundance_name].dropna(
                 thresh=2, subset=data_object[abundance_name].columns[1:])
             # This will cause the veen diagram to be different from R program
+        print(data_object[matrix_name])
         
         return data_object
 

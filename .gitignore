@@ -2,3 +2,4 @@ input/*
 csv/*
 images/*
 __pycache__/*
+.vscode/*
