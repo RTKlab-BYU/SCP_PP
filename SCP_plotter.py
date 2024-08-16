@@ -65,10 +65,9 @@ class SCP_plotter:
         for eachGroup in group_names:
             run_ids = saved_settings[eachGroup]["records"]
             runname_sublist = data_object["run_metadata"].loc[data_object["run_metadata"]["Run Identifier"].isin(run_ids)]["Run Names"].to_list()
-            
-            group_dict[eachGroup] = self.processor.filter_by_id(
-                data_object,
-                run_ids)  # prevent the list from being changed
+            group_dict[eachGroup] =  self.processor.filter_by_id(
+                    data_object,
+                    run_ids) # prevent the list from being changed
             runname_list.append(runname_sublist)
             i += 1
 
@@ -550,10 +549,16 @@ class SCP_plotter:
         for eachGroup in group_names:
             run_ids = saved_settings[eachGroup]["records"]
             runname_sublist = data_object["run_metadata"].loc[data_object["run_metadata"]["Run Identifier"].isin(run_ids)]["Run Names"].to_list()
+            if self.processor.data_type == "TMT":
+                channel_ids = data_object["run_metadata"].loc[data_object["run_metadata"]["Run Identifier"].isin(run_ids)]["Channel Identifier"].to_list()
+                group_dict[eachGroup] =  self.processor.filter_by_channel_id(
+                    data_object,
+                    channel_ids)  
+            elif self.processor.data_type == "LF":
 
-            group_dict[eachGroup] =  self.processor.filter_by_id(
-                data_object,
-                run_ids)  # prevent the list from being changed
+                group_dict[eachGroup] =  self.processor.filter_by_id(
+                    data_object,
+                    run_ids)  # prevent the list from being changed
             runname_list.append(runname_sublist)
             # print(runname_sublist)
             i += 1
@@ -572,15 +577,19 @@ class SCP_plotter:
         for eachCondition in group_names:
             # Protein ID summary
             currentData = group_dict[eachCondition]
-            current =  self.processor.calculate_missing_values_MS2(currentData, is_protein=True)
-            # print(current)
-            current["Conditions"] = eachCondition
-            allProteins = pd.concat([allProteins, current])
-            # Peptide ID summary
-            current =  self.processor.calculate_missing_values_MS2(currentData, is_protein=False)
-            current["Conditions"] = eachCondition
-            allPeptides = pd.concat([allPeptides, current])
+            if self.processor.ignore_proteins == False:
+                current =  self.processor.calculate_missing_values_MS2(currentData, is_protein=True)
+                # print(current)
+                current["Conditions"] = eachCondition
+                allProteins = pd.concat([allProteins, current])
+                # print(allProteins)
+            if self.processor.ignore_peptides == False:
+                # Peptide ID summary
+                current =  self.processor.calculate_missing_values_MS2(currentData, is_protein=False)
+                current["Conditions"] = eachCondition
+                allPeptides = pd.concat([allPeptides, current])
 
+        
         # ######################allIDs format###################
         # name	ID_Type	ID_Mode	Conditions	IDs
         # file1	peptide	MS2_IDs	experimetn 1	xxxxx
@@ -935,10 +944,16 @@ class SCP_plotter:
 
             run_ids = saved_settings[eachGroup]["records"]
             runname_sublist = data_object["run_metadata"].loc[data_object["run_metadata"]["Run Identifier"].isin(run_ids)]["Run Names"].to_list()
-            
-            group_dict[eachGroup] =  self.processor.filter_by_id(
-                data_object,
-                list(run_ids))  # prevent the list from being changed
+            if self.processor.data_type == "TMT":
+                channel_ids = data_object["run_metadata"].loc[data_object["run_metadata"]["Run Identifier"].isin(run_ids)]["Channel Identifier"].to_list()
+                group_dict[eachGroup] =  self.processor.filter_by_channel_id(
+                    data_object,
+                    channel_ids)  
+            elif self.processor.data_type == "LF":
+
+                group_dict[eachGroup] =  self.processor.filter_by_id(
+                    data_object,
+                    run_ids)  # prevent the list from being changed
             runname_list.append(runname_sublist)
             i += 1
 
@@ -1214,9 +1229,16 @@ class SCP_plotter:
             run_ids = saved_settings[eachGroup]["records"]
             runname_sublist = data_object["run_metadata"].loc[data_object["run_metadata"]["Run Identifier"].isin(run_ids)]["Run Names"].to_list()
             
-            group_dict[eachGroup] = self.processor.filter_by_id(
-                data_object,
-                list(run_ids))  # prevent the list from being changed
+            if self.processor.data_type == "TMT":
+                channel_ids = data_object["run_metadata"].loc[data_object["run_metadata"]["Run Identifier"].isin(run_ids)]["Channel Identifier"].to_list()
+                group_dict[eachGroup] =  self.processor.filter_by_channel_id(
+                    data_object,
+                    channel_ids)  
+            elif self.processor.data_type == "LF":
+
+                group_dict[eachGroup] =  self.processor.filter_by_id(
+                    data_object,
+                    run_ids) # prevent the list from being changed
             runname_list.append(runname_sublist)
             i += 1
         
@@ -1440,9 +1462,18 @@ class SCP_plotter:
             run_ids = saved_settings[eachGroup]["records"]
             runname_sublist = data_object["run_metadata"].loc[data_object["run_metadata"]["Run Identifier"].isin(run_ids)]["Run Names"].to_list()
             
-            group_dict[eachGroup] = self.processor.filter_by_id(
-                data_object,
-                list(run_ids))  # prevent the list from being changed
+            if self.processor.data_type == "TMT":
+                print(data_object["protein_ID_matrix"])
+                channel_ids = data_object["run_metadata"].loc[data_object["run_metadata"]["Run Identifier"].isin(run_ids)]["Channel Identifier"].to_list()
+                group_dict[eachGroup] =  self.processor.filter_by_channel_id(
+                    data_object,
+                    channel_ids)  
+                print(group_dict[eachGroup]["protein_ID_matrix"])
+            elif self.processor.data_type == "LF":
+
+                group_dict[eachGroup] =  self.processor.filter_by_id(
+                    data_object,
+                    run_ids) # prevent the list from being changed
             runname_list.append(runname_sublist)
             i += 1
         data_set = []
@@ -1459,7 +1490,7 @@ class SCP_plotter:
         for eachGroup in group_names:
             
             current_condition_data = self.processor.filter_by_missing_values_MS2(
-                group_dict[eachGroup], is_protein=is_protein, missing_value_thresh=99)
+                group_dict[eachGroup], is_protein=is_protein, missing_value_thresh=miss_val_thresh)
 
             data_set.append(
                 set(current_condition_data[matrix_name][molecule_name].unique()))
@@ -1661,9 +1692,16 @@ class SCP_plotter:
         for eachGroup in group_names:
             runname_sublist = saved_settings[eachGroup]["records"]
 
-            group_dict[eachGroup] = self.processor.filter_by_id(
-                data_object,
-                list(runname_sublist))  # prevent the list from being changed
+            if self.processor.data_type == "TMT":
+                channel_ids = data_object["run_metadata"].loc[data_object["run_metadata"]["Run Identifier"].isin(runname_sublist)]["Channel Identifier"].to_list()
+                group_dict[eachGroup] =  self.processor.filter_by_channel_id(
+                    data_object,
+                    channel_ids)  
+            elif self.processor.data_type == "LF":
+
+                group_dict[eachGroup] =  self.processor.filter_by_id(
+                    data_object,
+                    runname_sublist)  # prevent the list from being changed
             runname_list.append(runname_sublist)
             i += 1
         # create a dictionary to store the intensity data
@@ -1891,8 +1929,12 @@ class SCP_plotter:
         ref_name = plot_options["reference_group"]
 
         run_ids = saved_settings[ref_name]["records"]
-        
-        ref_data = self.processor.filter_by_id(data_object,list(run_ids))["protein_abundance"]
+        if self.processor.data_type == "TMT":
+            channel_ids = data_object["run_metadata"].loc[data_object["run_metadata"]["Run Identifier"].isin(run_ids)]["Channel Identifier"].to_list()
+            ref_data = self.processor.filter_by_channel_id(data_object,channel_ids)["protein_abundance"] 
+        elif self.processor.data_type == "LF":
+
+            ref_data = self.processor.filter_by_id(data_object,list(run_ids))["protein_abundance"]
         ref_data["average_intensity"] = ref_data.mean(axis=1)
         ref_data = ref_data.sort_values(by="average_intensity",ascending = False).drop_duplicates(subset='Accession', keep='first').dropna().reset_index()
         ranked_proteins = pd.DataFrame({"Accession": ref_data["Accession"],
@@ -1912,10 +1954,16 @@ class SCP_plotter:
         for eachGroup in group_names:
             run_ids = saved_settings[eachGroup]["records"]
             runname_sublist = data_object["run_metadata"].loc[data_object["run_metadata"]["Run Identifier"].isin(run_ids)]["Run Names"].to_list()
-            
-            group_dict[eachGroup] = self.processor.filter_by_id(
-                data_object,
-                list(run_ids))  # prevent the list from being changed
+            if self.processor.data_type == "TMT":
+                channel_ids = data_object["run_metadata"].loc[data_object["run_metadata"]["Run Identifier"].isin(run_ids)]["Channel Identifier"].to_list()
+                group_dict[eachGroup] =  self.processor.filter_by_channel_id(
+                    data_object,
+                    channel_ids)  
+            elif self.processor.data_type == "LF":
+
+                group_dict[eachGroup] =  self.processor.filter_by_id(
+                    data_object,
+                    run_ids) # prevent the list from being changed
             runname_list.append(runname_sublist)
             i += 1
         # create a dictionary to store the intensity data
@@ -2040,10 +2088,16 @@ class SCP_plotter:
         for eachGroup in group_names:
             run_ids = saved_settings[eachGroup]["records"]
             runname_sublist = data_object["run_metadata"].loc[data_object["run_metadata"]["Run Identifier"].isin(run_ids)]["Run Names"].to_list()
-            
-            group_dict[eachGroup] = self.processor.filter_by_id(
-                data_object,
-                list(run_ids))  # prevent the list from being changed
+            if self.processor.data_type == "TMT":
+                channel_ids = data_object["run_metadata"].loc[data_object["run_metadata"]["Run Identifier"].isin(run_ids)]["Channel Identifier"].to_list()
+                group_dict[eachGroup] =  self.processor.filter_by_channel_id(
+                    data_object,
+                    channel_ids)  
+            elif self.processor.data_type == "LF":
+
+                group_dict[eachGroup] =  self.processor.filter_by_id(
+                    data_object,
+                    run_ids) # prevent the list from being changed
             runname_list.append(runname_sublist)
             i += 1
         # create a dictionary to store the intensity data
@@ -2165,6 +2219,7 @@ class SCP_plotter:
             volcanoData = volcanoData.assign(notRegulated=lambda x: (abs(
             np.log10(volcanoData[group2+'_Intensity']/volcanoData[
                     group1+'_Intensity'])) <=np.log10(1.25)) & (~volcanoData['significant']))
+            print(volcanoData)
             fig = self.plot_volcano_colored(
                 volcanoData,
                 label=f"({group2}/{group1})",
@@ -2303,9 +2358,16 @@ class SCP_plotter:
             run_ids = saved_settings[eachGroup]["records"]
             runname_sublist = data_object["run_metadata"].loc[data_object["run_metadata"]["Run Identifier"].isin(run_ids)]["Run Names"].to_list()
             
-            group_dict[eachGroup] = self.processor.filter_by_id(
-                data_object,
-                list(run_ids))  # prevent the list from being changed
+            if self.processor.data_type == "TMT":
+                channel_ids = data_object["run_metadata"].loc[data_object["run_metadata"]["Run Identifier"].isin(run_ids)]["Channel Identifier"].to_list()
+                group_dict[eachGroup] =  self.processor.filter_by_channel_id(
+                    data_object,
+                    channel_ids)  
+            elif self.processor.data_type == "LF":
+
+                group_dict[eachGroup] =  self.processor.filter_by_id(
+                    data_object,
+                    run_ids)  # prevent the list from being changed
             runname_list.append(runname_sublist)
             i += 1       
             #print((runname_sublist))
@@ -2486,9 +2548,16 @@ class SCP_plotter:
             run_ids = saved_settings[eachGroup]["records"]
             runname_sublist = data_object["run_metadata"].loc[data_object["run_metadata"]["Run Identifier"].isin(run_ids)]["Run Names"].to_list()
             
-            group_dict[eachGroup] = self.processor.filter_by_id(
-                data_object,
-                list(run_ids))  # prevent the list from being changed
+            if self.processor.data_type == "TMT":
+                channel_ids = data_object["run_metadata"].loc[data_object["run_metadata"]["Run Identifier"].isin(run_ids)]["Channel Identifier"].to_list()
+                group_dict[eachGroup] =  self.processor.filter_by_channel_id(
+                    data_object,
+                    channel_ids)  
+            elif self.processor.data_type == "LF":
+
+                group_dict[eachGroup] =  self.processor.filter_by_id(
+                    data_object,
+                    run_ids)  # prevent the list from being changed
             runname_list.append(runname_sublist)
             i += 1       
             #print((runname_sublist))
@@ -2504,6 +2573,7 @@ class SCP_plotter:
 
             current_condition_data = self.processor.filter_by_missing_values(
                 group_dict[eachGroup])
+            # print(current_condition_data)
             normalized_data = self.processor.NormalizeToMedian(
                 current_condition_data["protein_abundance"],apply_log2=False) #apply this later
             if self.data_type == "TMT":
@@ -2512,8 +2582,10 @@ class SCP_plotter:
             elif self.data_type == "LF":
                 toFileDict = dict(zip(data_object["run_metadata"]["Run Identifier"],
                                 [eachGroup + "_#" + str(i) for i in range(len(data_object["run_metadata"]["Run Identifier"]))]))
+            print(toFileDict)
             toFileDict = self.processor.generate_column_to_name_mapping(normalized_data.columns, toFileDict)
             normalized_data.rename(columns = toFileDict,inplace=True)
+            # print(normalized_data)
 
             combined_infodata= pd.concat([combined_infodata, pd.DataFrame({
                 "Sample_Groups": normalized_data
@@ -2558,10 +2630,10 @@ class SCP_plotter:
                     n]].columns:
                 combined_heatmap_data[col] = combined_heatmap_data[col]/magicNum
 
-        
-        if self.write_output or plot_options["significant_only"]:
-            
-
+            # print(combined_heatmap_data)
+        if self.write_output == True or plot_options["significant_only"] == True:
+            print(normalized_data)
+            print(combined_heatmap_data)
             # How to transpose :(
             # detect differentially expressed proteins
             # reformat dataframe
@@ -2574,8 +2646,10 @@ class SCP_plotter:
             renamed_data = combined_heatmap_data.copy()
             renamed_data.columns = new_names
             # display(combined_heatmap_data)
+            print(renamed_data)
             long_data = pd.wide_to_long(renamed_data.reset_index(),
                                         stubnames="Intensity",i="Accession",j="Sample",suffix=".*").reset_index()
+            print(long_data)
             
             # if plot_options["agg_groups"]:
             #     # long_data= long_data.groupby(["Accession", "Group"]).agg({"Intensity": "mean"}).reset_index()
@@ -2586,6 +2660,7 @@ class SCP_plotter:
             # else:
             #     index = "Sample"
             pivoted_data =  long_data.pivot(index="Sample",columns="Accession", values = "Intensity").reset_index()
+            print(pivoted_data)
             pivoted_data["Group"] = pivoted_data["Sample"].str.replace("_#.*","",regex=True)
             # new_cols = combined_heatmap_data.columns.drop("Accession")
             # display(pivoted_data)
