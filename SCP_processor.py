@@ -578,13 +578,6 @@ class SCP_processor:
                 
 
                 # get ID matrix tables
-                prot_ID = prot_abundance.copy()
-                cols = [col for col in prot_ID.columns if col != 'Accession']
-                for col in cols:
-                    if prot_ID[col].dtype != 'object': # Check if not a string column
-                        prot_ID[col].replace(0, np.nan, inplace=True)
-                        # Replace all numerical values to ID
-                        prot_ID[col] = prot_ID[col].astype(str).str.replace("\d+\.\d+", "ID", regex=True)
                 pep_ID = pep_abundance.copy()
                 cols = [col for col in pep_ID.columns if col != 'Annotated Sequence	']
                 for col in cols:
@@ -622,8 +615,8 @@ class SCP_processor:
             # Proteins ID table
             
             # remove "Spectral Count", " MaxLFQ Intensity" or " Intensity" from names
-                run_list = [name.split("#")[0] for name in all_ID_cols.drop("Annotated Sequence")]
-                channel_list = [name.split("#")[1] for name in all_ID_cols.drop("Annotated Sequence")]
+                run_list = [name.split("#")[0] for name in all_ID_cols.drop("Accession")]
+                channel_list = [name.split("#")[1] for name in all_ID_cols.drop("Accession")]
                 
                 run_name_list = pd.DataFrame({"Run Names": run_list})
                 unique_run_list = list(set(run_list))
@@ -640,7 +633,7 @@ class SCP_processor:
 
                 for item in [prot_abundance,prot_ID_MS2]:
                     # Generate a new column name mapping using the function
-                    fileid_mapping = self.generate_column_to_name_mapping(item.columns, dict(zip(all_ID_cols.drop("Annotated Sequence"),run_name_list["Channel Identifier"])))
+                    fileid_mapping = self.generate_column_to_name_mapping(item.columns, dict(zip(all_ID_cols.drop("Accession"),run_name_list["Channel Identifier"])))
                     item.rename(columns = fileid_mapping,inplace=True)
                 
 
@@ -653,7 +646,6 @@ class SCP_processor:
                         # Replace all numerical values to ID
                         prot_ID[col] = prot_ID[col].astype(str).str.replace("\d+\.\d+", "ID", regex=True)
                 pep_ID = pep_abundance.copy()
-                cols = [col for col in pep_ID.columns if col != 'Annotated Sequence	']
             #Rename protein numbers
             
                 cols = [col for col in prot_ID_MS2.columns if col != 'Accession']
