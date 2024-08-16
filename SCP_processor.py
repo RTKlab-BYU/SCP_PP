@@ -924,7 +924,7 @@ class SCP_processor:
             saved_settings[eachGroup]["records"] = []
             filterOutType = type(saved_settings[eachGroup]["filter_out"])
             if filterOutType == str or filterOutType == int or filterOutType == float and not pd.isna(saved_settings[eachGroup]["filter_out"]):
-                filterOut = str.split(saved_settings[eachGroup]["filter_out"],sep = ",")
+                filterOut = str.split(str(saved_settings[eachGroup]["filter_out"]),sep = ",")
             else:
                 filterOut = ["M@di"]
             if len(str.split(str(saved_settings[eachGroup]["filter_in"]),sep = "@")) > 1: #multiple files, only some have the runs for this group

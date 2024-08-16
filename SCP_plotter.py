@@ -2576,10 +2576,10 @@ class SCP_plotter:
             # print(current_condition_data)
             normalized_data = self.processor.NormalizeToMedian(
                 current_condition_data["protein_abundance"],apply_log2=False) #apply this later
-            if self.data_type == "TMT":
+            if self.processor.data_type == "TMT":
                 toFileDict = dict(zip(data_object["run_metadata"]["Channel Identifier"],
                                 [eachGroup + "_#" + str(i) for i in range(len(data_object["run_metadata"]["Channel Identifier"]))]))
-            elif self.data_type == "LF":
+            elif self.processor.data_type == "LF":
                 toFileDict = dict(zip(data_object["run_metadata"]["Run Identifier"],
                                 [eachGroup + "_#" + str(i) for i in range(len(data_object["run_metadata"]["Run Identifier"]))]))
             print(toFileDict)
