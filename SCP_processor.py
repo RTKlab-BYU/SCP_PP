@@ -161,22 +161,22 @@ class SCP_processor:
             if self.ignore_peptides == False:
                 peptide_table = pd.read_table(input2,low_memory=False)
                 peptide_table= peptide_table[~peptide_table[
-                'Mapped Proteins'].str.contains(
+                'Protein'].str.contains(
                 "contam_sp", na=False)]
 
                 if USE_MaxLFQ:
                     column_tail = " MaxLFQ Intensity"
-                    intensity_cols = protein_table.columns[
-                        protein_table.columns.str.contains(column_tail)].tolist() #These should be the same for MS2
+                    intensity_cols = peptide_table.columns[
+                        peptide_table.columns.str.contains(column_tail)].tolist() #These should be the same for MS2
                 else:
                     column_tail = " Intensity" #this includes MaxLFQ Intensity
-                    cols = protein_table.columns
-                    intensity_cols =  protein_table.columns[( \
+                    cols = peptide_table.columns
+                    intensity_cols =  peptide_table.columns[( \
                         cols.str.contains(" Intensity")) & \
                         (~cols.str.contains(" MaxLFQ Intensity"))]
                 cols = peptide_table.columns
                 pep_ID_cols = peptide_table.columns[(cols.str.contains(" Spectral Count"))] #so we remove MaxLFQ Intensity here
-                #get the column names of protein_table that contain "Intensity" but not " MaxLFQ"
+                #get the column names of peptide_table that contain "Intensity" but not " MaxLFQ"
                 ## Peptide abundance table
                 peptide_table.rename(columns={'Peptide Sequence': 'Annotated Sequence'}, inplace=True)
                 all_abundance_cols = intensity_cols.append(pd.Index(['Annotated Sequence']))
@@ -195,8 +195,14 @@ class SCP_processor:
                 pep_ID_MS2 = pep_ID_MS2.rename(columns={
                     col: col.replace(" Spectral Count", "") for col in
                     pep_ID_MS2.columns if " Spectral Count" in col})
+                # remove "Spectral Count", " MaxLFQ Intensity" or " Intensity" from names
+                run_name_list = [name.replace(column_tail, "")
+                                    for name in intensity_cols]
                 
-                for item in [prot_abundance,pep_abundance,pep_ID_MS2,prot_ID_MS2]:
+                run_name_list = pd.DataFrame({"Run Names": run_name_list})
+                run_name_list['Run Identifier'] = run_name_list.index.to_series().apply(lambda x: str(file_id) + "-" + str(x))
+
+                for item in [pep_abundance,pep_ID_MS2]:
                 # Generate a new column name mapping using the function
                     fileid_mapping = self.generate_column_to_name_mapping(item.columns, dict(zip(run_name_list["Run Names"],run_name_list["Run Identifier"])))
                     item.rename(columns = fileid_mapping,inplace=True)
@@ -229,7 +235,7 @@ class SCP_processor:
                 
                 protein_table= protein_table[~protein_table['Protein'].str.contains(
                     "contam_sp", na=False)].query(
-                    "`Combined Total Peptides` >= @min_unique_peptides")
+                    "`Combined Total Peptides` >= @self.min_unique_peptides")
                 # get experiment names from columns names containning "Intensity"
                 # or " MaxLFQ Intensity" if MaxLFQ is used
 
@@ -262,7 +268,14 @@ class SCP_processor:
                 prot_ID_MS2 = prot_ID_MS2.rename(columns={
                 col: col.replace(" Unique Spectral Count", "") for col in
                 prot_ID_MS2.columns if " Unique Spectral Count" in col})
-            
+
+                # remove "Spectral Count", " MaxLFQ Intensity" or " Intensity" from names
+                run_name_list = [name.replace(column_tail, "")
+                                    for name in intensity_cols]
+                
+                run_name_list = pd.DataFrame({"Run Names": run_name_list})
+                run_name_list['Run Identifier'] = run_name_list.index.to_series().apply(lambda x: str(file_id) + "-" + str(x))
+
                 for item in [prot_abundance,prot_ID_MS2]:
                 # Generate a new column name mapping using the function
                     fileid_mapping = self.generate_column_to_name_mapping(item.columns, dict(zip(run_name_list["Run Names"],run_name_list["Run Identifier"])))
@@ -291,13 +304,7 @@ class SCP_processor:
                 prot_other_info = protein_table.loc[
                     :, ~protein_table.columns.str.contains('Intensity')]
                 prot_other_info["Source_File"] = input1
-            # remove "Spectral Count", " MaxLFQ Intensity" or " Intensity" from names
-            run_name_list = [name.replace(column_tail, "")
-                                for name in intensity_cols]
             
-            run_name_list = pd.DataFrame({"Run Names": run_name_list})
-            run_name_list['Run Identifier'] = run_name_list.index.to_series().apply(lambda x: str(file_id) + "-" + str(x))
-
 
         elif "PD_LF" in process_app:
 
@@ -356,7 +363,7 @@ class SCP_processor:
                 protein_table.rename(
                     columns={'# Peptides': 'number of peptides'}, inplace=True)
                 protein_table=protein_table.query(
-                    "`number of peptides` >= @min_unique_peptides")
+                    "`number of peptides` >= @self.min_unique_peptides")
                 prot_abundance = protein_table.filter(regex='Abundance:|Accession')
                 prot_ID = protein_table.filter(regex='Found in Sample:|Accession')
                 prot_other_info = protein_table.loc[:, ~protein_table.columns.str.contains('Found in Sample:|Abundance:')]
@@ -958,6 +965,7 @@ class SCP_processor:
                     
             elif len(str.split(str(saved_settings[eachGroup]["filter_in"]),sep = "@")) == 1: #across all files or maybe there is only one
                     for run_name in data_object["run_metadata"]["Run Names"]:
+                        run_id = data_object["run_metadata"].loc[data_object["run_metadata"]["Run Names"] ==  run_name,"Run Identifier"].tolist()[0]
                         filter_ins = str.split(str.split(str(saved_settings[eachGroup]["filter_in"]),sep = "@")[0],",")
                         matches_all = True
                         for filter_in in filter_ins:
@@ -1317,6 +1325,12 @@ class SCP_processor:
             p_values.append(benjamini)
 
         return p_values
+    
+    def percentile(SELF,percentile):
+        def percentile_(x):
+            return x.quantile(percentile)
+        percentile_.__name__ = 'percentile_{:02.0f}'.format(percentile*100)
+        return percentile_
 
     def impute_knn(self,abundance_data, k=5):
         """_inpute missing value from neighbor values_
@@ -1348,7 +1362,6 @@ class SCP_processor:
         # Replace the original values in abundance_data with imputed values
         x_imputed.insert(loc=0,column=name,value=names)
         return x_imputed
-
 
     def CalculatePCA(self,abundance_object, infotib,log2T = False):
         """_inpute PCA transformed and variance explained by each principal

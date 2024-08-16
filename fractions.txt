@@ -1,0 +1,5 @@
+Conditions	filter_in	filter_out	Analysis Program 	Fraction
+f1	GC7		FragPipe 	1
+f2	GC8		FragPipe 	2
+f3	GC9		FragPipe 	3
+f4	GC10		FragPipe 	4

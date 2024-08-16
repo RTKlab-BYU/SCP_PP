@@ -1,6 +1,7 @@
 import os
 from statsmodels.stats.multitest import multipletests
 from scipy.stats import f_oneway as anova
+from Bio.SeqUtils.ProtParam import ProteinAnalysis
 import scipy
 from scipy.stats import t
 import plotly.express as px
@@ -33,6 +34,411 @@ class SCP_plotter:
         self.url_base = None
         self.data_type = data_type
 
+    def Fraction_ID_plots(self, data_object, plot_options, saved_settings, username=None):
+        """_Prepare data for creating protein peptide identification bar
+        plot_
+
+        Args:
+            data_dict (_type_): _description_
+        """
+        # Create an empty dictionary to store the group names and filters
+        group_names = [key for key in saved_settings.keys() if "Order@" not in str(key)]
+
+        fraction_names = saved_settings["Order@Fraction"]
+
+        # import the data and save order
+        group_dict = {}
+
+        if plot_options["ID mode"] == "MS2" or plot_options["ID mode"] == "total" or plot_options["ID mode"] == "stacked":
+            x_axis_order = saved_settings["Order@Conditions"]
+        elif plot_options["Group By X"] == "ID_Mode":
+            print("ERROR: x axis separation of MS2/MBR not supported")
+        else:
+            x_axis_order = saved_settings["Order@"+plot_options["Group By X"]]
+        if plot_options["ID mode"] == "grouped" or plot_options["ID mode"] == "grouped_stacked" and plot_options["Group By Color"] != "ID_Mode":
+            color_order = saved_settings["Order@"+plot_options["Group By Color"]]
+            plot_options["color_order"] = color_order
+
+        plot_options["x_axis_order"] = x_axis_order
+
+        # filter runs into different groups
+        i = 1
+        runname_list = []  # contain list of run names list for each groups
+        for eachGroup in group_names:
+            runname_sublist = saved_settings[eachGroup]["records"]
+
+            group_dict[eachGroup] = self.processor.filter_by_id(
+                data_object,
+                runname_sublist)  # prevent the list from being changed
+            runname_list.append(runname_sublist)
+            i += 1
+
+            #print(group_dict[eachGroup]["run_metadata"])
+        #display(data_object["protein_ID_Summary"])
+        #display(group_dict[eachGroup]["protein_ID_Summary"])
+        # create ID plots
+        # allIDs table will be used to store all experiment name, ID types (
+        # protein, peptide, MS2 and MS1 based), conditions and IDs numbers
+        allIDs = pd.DataFrame(
+            data={"Number of Fractions":[],"Cumulative IDs":[],"ID_Type":[]})
+        
+
+        # loop through each group and extract IDs, put them into allIDs table
+        cum_prot_IDs = pd.Series(data=[],name="Accession")
+        cum_pep_IDs = pd.Series(data=[],name="Annotated Sequence")
+        i = 0
+        for eachGroup in group_names:
+            i = i + 1
+            # Protein ID summary
+            prot_cols = [col for col in group_dict[eachGroup]["protein_ID_matrix"].columns if col != "Accession"]
+            # display(group_dict[eachGroup]["protein_ID_matrix"].replace("nan",np.nan).dropna(how="all",subset= prot_cols))
+            current_prots = group_dict[eachGroup]["protein_ID_matrix"].replace("nan",np.nan).dropna(how="all",subset= prot_cols)["Accession"]
+            print(current_prots)
+            print(cum_prot_IDs)
+            cum_prot_IDs = pd.merge(cum_prot_IDs, current_prots, how="outer").drop_duplicates()["Accession"]
+
+            # Peptide ID summary
+            pep_cols = [col for col in group_dict[eachGroup]["peptide_ID_matrix"].columns if col != "Annotated Sequence"]
+            current_peps = group_dict[eachGroup]["peptide_ID_matrix"].replace("nan",np.nan).dropna(how="all",subset=pep_cols)["Annotated Sequence"]
+            cum_pep_IDs = pd.merge(cum_pep_IDs, current_peps, how="outer").drop_duplicates()["Annotated Sequence"]
+            print(current_peps)
+
+            current_df = pd.DataFrame(data={"Number of Fractions":[str(i),str(i)],
+                                            "Cumulative IDs":[len(cum_prot_IDs.to_list()),len(cum_pep_IDs.to_list())],
+                                            "ID_Type":["protein","peptide"]})
+            allIDs = pd.concat([allIDs,current_df])
+            print(allIDs)
+
+
+        print(allIDs)
+
+        # ######################allIDs format###################
+        # name	ID_Type	ID_Mode	Conditions	IDs
+        # file1	peptide	MS2_IDs	experimetn 1	xxxxx
+        # file2	protein	MBR_IDs	experiment 2	xxxx
+        # file3	peptide	Total_IDs	experiment 3	xxx
+        #######################################################
+        # Calcuate mean, standard deviation and number of replicates for each
+        export_ids = allIDs.copy()
+        # choose protein or peptide
+        if plot_options["plot_type"] == "1":  # Protein ID
+            allIDs = allIDs[allIDs["ID_Type"] == "protein"]
+        elif plot_options["plot_type"] == "2":  # Peptide ID
+            allIDs = allIDs[allIDs["ID_Type"] == "peptide"]
+
+        toPlotIDs = allIDs
+    
+        #display(toPlotIDs)
+        fig = self.plot_fract_IDChart_plotly(toPlotIDs,
+                                username=username,
+                                plot_options=plot_options)
+
+        if self.write_output:    
+            # export the data to csv for user downloading
+            data_dir = os.path.join(self.app_folder, "csv/")
+            # create the directory if it does not exist
+            if not os.path.exists(data_dir):
+                Path(data_dir).mkdir(parents=True)
+            
+            
+            # export the data to csv
+            export_ids.to_csv(os.path.join(
+                data_dir, f"{username}_fract_ID_data.csv"), index=False)
+            
+            print("Downloading links...")
+
+            # create the link for downloading the data
+            CSV_link = f"/files/{self.url_base}/csv/" \
+                f"{username}_fract_ID_data.csv"
+
+            # add SVG download link
+
+            SVG_link = f"/files/{self.url_base}/images/" \
+                f"{username}_fract_ID_Bar_Plot.svg"
+
+            img_dir = os.path.join(self.app_folder, "images/")
+            if not os.path.exists(img_dir):
+                Path(img_dir).mkdir(parents=True)
+
+            fig.write_image(os.path.join(
+                img_dir, f"{username}_ID_Bar_Plot.svg"), format = "svg", validate = False, engine = "kaleido")
+
+
+        else:
+            CSV_link = None
+            SVG_link = None
+        return fig, CSV_link, SVG_link
+
+    def plot_fract_IDChart_plotly(self, ID_data,
+                            username=None,
+                            plot_options=None):
+        """_Plot the ID bar plot for the given data_
+
+        Args:
+            ID_data (_type_): _description_
+            username (str, optional): _description_. Defaults to "test".
+            plot_options (_type_, optional): _description_. Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
+
+        plot_div = None
+        
+
+        if plot_options["ID mode"] == "grouped":  
+            pass #only total supported right now
+            # plot options
+            # error bar
+        #     if plot_options["error bar"] == "stdev":
+        #         error_bars = "stdev"
+        #         error_visibile = True
+        #     elif plot_options["error bar"] == "ci95":
+        #         error_bars = "confInt"
+        #         error_visibile = True
+        #     else:
+        #         error_bars = "stdev"
+        #         error_visibile = False
+
+        #     # mean label
+        #     if plot_options["mean label"] == "True" or \
+        #             plot_options["mean label"] == True:
+        #         total_labels = [{"x": x, "y": total*1.15, "text": str(
+        #             int(total)), "showarrow": False} for x, total in zip(
+        #                 ID_data["Conditions"], ID_data["IDs"])]
+        #     else:
+        #         total_labels = []   # no mean labels
+
+        #     if plot_options["Group By X"] == "ID_Mode" or plot_options["Group By Color"] == "ID_Mode":  # total separated
+        #         ID_data = ID_data[ID_data["ID_Mode"] != "Total_IDs"]
+        #     else:
+        #         ID_data = ID_data[ID_data["ID_Mode"] == "Total_IDs"]
+        #     #find out present categories
+        #     categories = plot_options["color_order"]
+        #     # create the plot
+        #     fig_data = []
+        #     i = 0
+        #     for eachCategory in categories:
+        #         fig_data.append(go.Bar(name = eachCategory,
+        #                     x=ID_data.loc[ID_data[plot_options["Group By Color"]]==eachCategory,plot_options["Group By X"]].tolist(),
+        #                     y=ID_data.loc[ID_data[plot_options["Group By Color"]]==eachCategory,"IDs"].tolist(),
+        #                     marker_color = plot_options["color"][i],
+        #                     text = [round(x) for x in ID_data.loc[ID_data[plot_options["Group By Color"]]==eachCategory,"IDs"].tolist()],
+        #                     error_y=dict(
+        #                         type = "data",
+        #                         array = ID_data.loc[ID_data[plot_options["Group By Color"]]==eachCategory,error_bars].tolist(),
+        #                         visible = error_visibile
+        #                     )))
+        #         i = i + 1                    
+
+        #     fig = go.Figure(data = fig_data,
+        #                     layout=go.Layout(yaxis_title=plot_options["Y Title"],
+        #                     xaxis_title=plot_options["Group By X"],
+        #                     barmode="group",paper_bgcolor="rgba(255,255,255,255)",
+        #                     plot_bgcolor="rgba(255, 255, 255, 255)",
+        #                     yaxis=dict(showline=True, linewidth=1, linecolor='black'),
+        #                     xaxis=dict(showline=True, linewidth=1, linecolor='black')))
+        #     fig.update_xaxes(categoryorder='array', categoryarray = plot_options["x_axis_order"])
+
+        # elif plot_options["ID mode"] == "stacked":
+        #     # plot options
+        #     # error bar
+        #     if plot_options["error bar"] == "stdev":
+        #         error_bars = "stdev"
+        #         error_visibile = True
+        #     elif plot_options["error bar"] == "ci95":
+        #         error_bars = "confInt"
+        #         error_visibile = True
+        #     else:
+        #         error_bars = "stdev"
+        #         error_visibile = False
+
+        #     # mean label
+        #     if plot_options["mean label"] == "True" or \
+        #             plot_options["mean label"] == True:
+        #         total_labels = [{"x": x, "y": total*1.15, "text": str(
+        #             int(total)), "showarrow": False} for x, total in zip(
+        #                 ID_data["Conditions"], ID_data["IDs"])]
+        #     else:
+        #         total_labels = []   # no mean labels
+        #     if plot_options["Group By X"] == "ID_Mode" or plot_options["Group By Stack"] == "ID_Mode":  # total separated
+        #         ID_data = ID_data[ID_data["ID_Mode"] != "Total_IDs"]
+        #     else:
+        #         ID_data = ID_data[ID_data["ID_Mode"] == "Total_IDs"]
+
+        #     if plot_options["Group By Stack"] == "ID_Mode":
+        #         layers = ["MS2_IDs", "MBR_IDs"]
+        #     else:
+        #         layers = ID_data.groupby(plot_options["Group By Stack"]).first().reset_index()[plot_options["Group By Stack"]].tolist()
+        #     fig_data = []
+        #     last_layer = None
+        #     i = 0
+        #     for eachLayer in layers: 
+        #         if last_layer == None:
+        #             fig_data.append(go.Bar(
+        #                 name = eachLayer,
+        #                 x = ID_data.loc[(ID_data[plot_options["Group By Stack"]]==eachLayer),plot_options["Group By X"]].tolist(),
+        #                 y = ID_data.loc[(ID_data[plot_options["Group By Stack"]]==eachLayer),"IDs"].tolist(),
+        #                 marker_color = plot_options["color"][i],
+        #                 text = [round(x) for x in ID_data.loc[(ID_data[plot_options["Group By Stack"]]==eachLayer),"IDs"].tolist()],
+        #                 error_y= dict(
+        #                     type = "data",
+        #                     array = ID_data.loc[ID_data[plot_options["Group By Stack"]]==eachLayer,error_bars].tolist(),
+        #                     visible = error_visibile
+        #                 )
+        #             ))
+        #             bases = ID_data.loc[(ID_data[plot_options["Group By Stack"]]==eachLayer),"IDs"]
+        #             i = i + 1
+                    
+        #         else:
+        #             fig_data.append(go.Bar(
+        #                 name = eachLayer,
+        #                 x = ID_data.loc[(ID_data[plot_options["Group By Stack"]]==eachLayer),plot_options["Group By X"]].tolist(),
+        #                 y = ID_data.loc[(ID_data[plot_options["Group By Stack"]]==eachLayer),"IDs"].tolist(),
+        #                 base=bases,
+        #                 marker_color = plot_options["color"][i],
+        #                 opacity=0.5,
+        #                 text = [round(x) for x in bases + ID_data.loc[(ID_data[plot_options["Group By Stack"]]==eachLayer),"IDs"].tolist()],
+        #                 error_y= dict(
+        #                     type = "data",
+        #                     array = ID_data.loc[ID_data[plot_options["Group By Stack"]]==eachLayer,error_bars].tolist(),
+        #                     visible = error_visibile
+        #                 )
+        #             ))
+        #             print(bases)
+        #             bases = bases + ID_data.loc[(ID_data[plot_options["Group By Stack"]]==eachLayer),"IDs"].tolist()
+        #         last_layer = eachLayer
+        #     fig = go.Figure(
+        #             data = fig_data,
+        #             layout=go.Layout(
+        #             yaxis_title=plot_options["Y Title"],
+        #             xaxis_title=plot_options["Group By X"],
+        #             barmode="stack", 
+        #             paper_bgcolor="rgba(255,255,255,255)",
+        #             plot_bgcolor="rgba(255, 255, 255, 255)",
+        #             yaxis=dict(showline=True, linewidth=1, linecolor='black'),
+        #             xaxis=dict(showline=True, linewidth=1, linecolor='black')
+        #         ))          
+        #     fig.update_xaxes(categoryorder='array', categoryarray = plot_options["x_axis_order"])            
+        # elif plot_options["ID mode"] == "grouped_stacked":
+        #     # plot options
+        #     # error bar
+        #     if plot_options["error bar"] == "stdev":
+        #         error_bars = "stdev"
+        #         error_visibile = True
+        #     elif plot_options["error bar"] == "ci95":
+        #         error_bars = "confInt"
+        #         error_visibile = True
+        #     else:
+        #         error_bars = "stdev"
+        #         error_visibile = False
+
+        #     # mean label
+        #     if plot_options["mean label"] == "True" or \
+        #             plot_options["mean label"] == True:
+        #         total_labels = [{"x": x, "y": total*1.15, "text": str(
+        #             int(total)), "showarrow": False} for x, total in zip(
+        #                 ID_data["Conditions"], ID_data["IDs"])]
+        #     else:
+        #         total_labels = []   # no mean labels
+
+        #     if plot_options["Group By X"] == "ID_Mode" or plot_options["Group By Color"] == "ID_Mode"or plot_options["Group By Stack"] == "ID_Mode":  # total separated
+        #         ID_data = ID_data[ID_data["ID_Mode"] != "Total_IDs"]
+        #     else:
+        #         ID_data = ID_data[ID_data["ID_Mode"] == "Total_IDs"]
+
+        #     #make data tidy
+        #     if plot_options["Group By Stack"] == "ID_Mode":
+        #         layers = ["MS2_IDs", "MBR_IDs"]
+        #     else:
+        #         layers = ID_data.groupby(plot_options["Group By Stack"]).first().reset_index()[plot_options["Group By Stack"]].tolist()
+        #     categories = plot_options["color_order"]
+            
+        #     fig_data = []
+        #     i = 0
+        #     for eachCategory in categories:
+        #         last_layer = None
+        #         j = 0
+        #         for eachLayer in layers: 
+        #             if last_layer == None:
+        #                 fig_data.append(go.Bar(
+        #                     name = str(eachLayer) + " " + str(eachCategory),
+        #                     x = ID_data.loc[(ID_data[plot_options["Group By Color"]]==eachCategory)&(ID_data[plot_options["Group By Stack"]]==eachLayer),plot_options["Group By X"]],
+        #                     y = ID_data.loc[(ID_data[plot_options["Group By Color"]]==eachCategory)&(ID_data[plot_options["Group By Stack"]]==eachLayer),"IDs"],
+        #                     offsetgroup=i,
+        #                     text = [round(x) for x in ID_data.loc[(ID_data[plot_options["Group By Color"]]==eachCategory)&(ID_data[plot_options["Group By Stack"]]==eachLayer),"IDs"].tolist()],
+        #                     marker_color = plot_options["color"][i],
+        #                     error_y = dict(
+        #                         type = "data",
+        #                         array = ID_data.loc[(ID_data[plot_options["Group By Color"]]==eachCategory)&(ID_data[plot_options["Group By Stack"]]==eachLayer),error_bars],
+        #                         visible=True)
+        #                 ))
+        #                 bases = ID_data.loc[(ID_data[plot_options["Group By Color"]]==eachCategory)&(ID_data[plot_options["Group By Stack"]]==eachLayer),"IDs"]
+        #             else:
+
+        #                 fig_data.append(go.Bar(
+        #                     name = str(eachLayer) + " " + str(eachCategory),
+        #                     x = ID_data.loc[(ID_data[plot_options["Group By Color"]]==eachCategory)&(ID_data[plot_options["Group By Stack"]]==eachLayer),plot_options["Group By X"]],
+        #                     y = ID_data.loc[(ID_data[plot_options["Group By Color"]]==eachCategory)&(ID_data[plot_options["Group By Stack"]]==eachLayer),"IDs"],
+        #                     base=bases,
+        #                     offsetgroup=i,
+        #                     text = [round(x) for x in ID_data.loc[(ID_data[plot_options["Group By Color"]]==eachCategory)&(ID_data[plot_options["Group By Stack"]]==eachLayer),"IDs"].tolist()+bases],
+        #                     marker_color = plot_options["color"][i],
+        #                     opacity=1/2**j,
+        #                     error_y = dict(
+        #                         type = "data",
+        #                         array = ID_data.loc[(ID_data[plot_options["Group By Color"]]==eachCategory)&(ID_data[plot_options["Group By Stack"]]==eachLayer),error_bars],
+        #                         visible=True)
+        #                     ))
+        #                 bases = bases + ID_data.loc[(ID_data[plot_options["Group By Color"]]==eachCategory)&(ID_data[plot_options["Group By Stack"]]==eachLayer),"IDs"].tolist()
+        #             last_layer=eachLayer
+        #             j = j + 1
+        #         i = i + 1
+
+        #     fig = go.Figure(
+        #         fig_data,
+        #         layout=go.Layout(
+        #             yaxis_title=plot_options["Y Title"],
+        #             xaxis_title=plot_options["Group By X"],
+        #             barmode="group",
+        #             plot_bgcolor="rgba(255, 255, 255, 255)",
+        #             paper_bgcolor="rgba(255, 255, 255, 255)",
+        #             yaxis=dict(showline=True, linewidth=1, linecolor='black'),
+        #             xaxis=dict(showline=True, linewidth=1, linecolor='black')
+        #         )
+        #     )
+        #     fig.update_xaxes(categoryorder='array', categoryarray = plot_options["x_axis_order"])
+        else:
+            # mean label
+            if plot_options["mean label"] == "True" or \
+                    plot_options["mean label"] == True:
+                total_labels = [{"x": x, "y": total*1.15, "text": str(
+                    int(total)), "showarrow": False} for x, total in zip(
+                        ID_data["Number of Fractions"], ID_data["Cumulative IDs"])]
+            else:
+                total_labels = []   # no mean labels
+
+            # create the plot
+            fig = px.bar(ID_data,
+                        x="Number of Fractions",
+                        y="Cumulative IDs",
+                        color="Number of Fractions",
+                        color_discrete_sequence=plot_options["color"],
+                        width=plot_options["width"],
+                        height=plot_options["height"],
+                        )
+            fig.update_layout(xaxis_title=plot_options["X Title"],
+                            yaxis_title=plot_options["Y Title"],
+                            annotations=total_labels,
+                            font=plot_options["font"],
+                            plot_bgcolor ="rgba(255, 255, 255, 255)",
+                            paper_bgcolor="rgba(255, 255, 255, 255)",
+                            yaxis=dict(showline=True, linewidth=1, linecolor='black'),
+                            xaxis=dict(showline=True, linewidth=1, linecolor='black'),
+                            showlegend=False
+                            )
+            fig.update_xaxes(categoryorder='array', categoryarray = plot_options["x_axis_order"])
+        return fig
 
     def ID_plots(self, data_object, plot_options, saved_settings, username=None):
         """_Prepare data for creating protein peptide identification bar
@@ -2530,6 +2936,151 @@ class SCP_plotter:
 
         return fig, CSV_link, SVG_link
 
+    
+    
+    def GRAVY_Boxplot(self,data_obj, plot_options, saved_settings, settings_file, username = None):
+        settings_table = pd.read_table(settings_file,sep="\t")
+        all_gravy = pd.DataFrame({"Sequence":[],"Conditions":[]})
+
+        group_names = [key for key in saved_settings.keys() if "Order@" not in str(key)]
+
+        for eachGroup in group_names:
+            runname_sublist = saved_settings[eachGroup]["records"]
+            print(runname_sublist)        
+            print(data_obj["peptide_abundance"].shape)
+            current_obj = self.processor.filter_by_id(data_obj, runname_sublist)
+            print(current_obj["peptide_abundance"].shape)
+            current_obj = self.processor.filter_by_missing_values(current_obj, is_protein=False)
+            current = pd.DataFrame({"Sequence": current_obj["peptide_abundance"]["Annotated Sequence"]})
+            current["Conditions"] = eachGroup
+            print(current.shape)
+            all_gravy = pd.concat([all_gravy, current])
+        
+
+        all_gravy["GRAVY"] = [ProteinAnalysis(peptide).gravy() for peptide in all_gravy["Sequence"].tolist()]
+        all_gravy = all_gravy.merge(settings_table, how="inner")
+
+        
+        return self.plot_GRAVY_boxplots(all_gravy, plot_options, settings_table, username)
+
+    def plot_GRAVY_boxplots(self, gravies, plot_options, settings, username):
+        
+        plot_div = None
+        CSV_link = None
+        png_link = None
+
+
+        if not plot_options["ylimits"] or plot_options["ylimits"] == "[]" or \
+                not isinstance(plot_options["ylimits"], list):
+            ylimits = None
+        else:
+            ylimits = plot_options["ylimits"]
+
+        #Remove outliers
+        if plot_options["outliers"] == "remove":
+            q_low = gravies["GRAVY"].quantile(0.01)
+            q_hi  = gravies["GRAVY"].quantile(0.99)
+            min_p = 0.01
+            max_p = 0.99
+
+            gravies = gravies[(gravies["GRAVY"] < q_hi) & (gravies["GRAVY"] > q_low)]
+            plot_options["outliers"] = False
+        else:
+            min_p = 0
+            max_p = 1
+        
+
+        
+        gravy_Summary = gravies.groupby(["Conditions"]).agg(
+            {'GRAVY': [self.processor.percentile(min_p),self.processor.percentile(0.25),'median',self.processor.percentile(0.75),self.processor.percentile(max_p), 'mean']}).reset_index()
+        gravy_Summary.columns = ["Conditions","min","25p", 'meds',"75p","max", 'mean']
+        # median label
+        if plot_options["median label"] == "True" or \
+                plot_options["median label"] == True:
+            total_labels = [{"x": x, "y": total*1.15, "text": str(
+                round(total,1)), "showarrow": False} for x, total in zip(
+                gravy_Summary["Conditions"], gravy_Summary["meds"])]
+        else:
+            total_labels = []   # no median labels
+        
+
+        if plot_options["GRAVY mode"] == "grouped":  
+                
+            #find out present categories
+            categories = settings[plot_options["Group By Color"]].drop_duplicates().tolist()
+            fig_data = []
+            i = 0
+            for eachCategory in categories:
+                fig_data.append(go.Box(name = eachCategory,
+                            x=gravies.loc[gravies[plot_options["Group By Color"]]==eachCategory,plot_options["Group By X"]].tolist(),
+                            y=gravies.loc[gravies[plot_options["Group By Color"]]==eachCategory,"GRAVY"].tolist(),
+                            line={"color":plot_options["color"][i]},
+                            fillcolor = plot_options["color"][i],
+                            boxpoints=plot_options["outliers"],
+                            marker=dict(opacity=0)
+                            ))
+                i = i + 1
+
+            fig = go.Figure(data = fig_data)
+            fig.update_layout(
+                boxmode = "group",
+                plot_bgcolor='white',
+                paper_bgcolor='white',
+                font=plot_options["font"],
+                yaxis=dict(title=plot_options["Y Title"],range=ylimits,showline=True, linewidth=1, linecolor='black'),
+                xaxis=dict(title=plot_options["X Title"],showline=True, linewidth=1, linecolor='black'))
+            xaxisorder = settings[plot_options["Group By X"]].drop_duplicates().tolist()
+        else:
+        # create the interactive plot
+            fig = px.box(gravies,
+                            x="Conditions",
+                            y='GRAVY',
+                            color="Conditions",
+                            color_discrete_sequence=plot_options["color"],
+                            width=plot_options["width"],
+                            height=plot_options["height"],
+                            )
+
+            fig.update_layout(
+                yaxis=dict(title=plot_options["Y Title"],
+                        range=ylimits,showline=True, linewidth=1, linecolor='black'),
+                font=plot_options["font"],
+                xaxis=dict(title=plot_options["X Title"],showline=True, linewidth=1, linecolor='black'),
+                showlegend=False,
+                annotations=total_labels,
+                boxmode = "group",
+                plot_bgcolor='white',
+                paper_bgcolor='white',
+            )
+            xaxisorder = settings["Conditions"].drop_duplicates().tolist()
+        fig.update_xaxes(categoryorder='array', categoryarray = xaxisorder)
+        if self.write_output:        
+            # create the file for donwnload
+            img_dir = os.path.join(self.app_folder, "images/")
+            if not os.path.exists(img_dir):
+                Path(img_dir).mkdir(parents=True)
+
+            fig.write_image(os.path.join(
+                img_dir, f"{username}_Gravy_Boxplot.png"), format = "png", validate = False, engine = "kaleido", scale = 10)
+            
+            # create the download CSV and its link
+            data_dir = os.path.join(self.app_folder, "csv/")
+            if not os.path.exists(data_dir):
+                Path(data_dir).mkdir(parents=True)
+            gravies.to_csv(os.path.join(
+                data_dir, f"{username}_all_gravy.csv"), index=False)
+            gravy_Summary.to_csv(os.path.join(
+                data_dir, f"{username}_GRAVY_Summary.csv"), index=False)
+            print("Downloading links...")
+            CSV_link = f"/files/{self.url_base}/csv/" \
+                f"{username}_all_gravy.csv"
+
+            # download png link
+            png_link = f"/files/{self.url_base}/images/" \
+                f"{username}_Intensity_boxplot.png"
+
+        return fig, CSV_link, png_link
+    
     def heatmap_plots(self, data_object, plot_options, saved_settings, username=None):
         group_names = []
 
