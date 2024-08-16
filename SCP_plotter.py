@@ -2646,9 +2646,9 @@ class SCP_plotter:
             renamed_data = combined_heatmap_data.copy()
             renamed_data.columns = new_names
             # display(combined_heatmap_data)
+            renamed_data = renamed_data.drop_duplicates(subset=["Accession"]).reset_index()
             print(renamed_data)
-            long_data = pd.wide_to_long(renamed_data.drop_duplicates(subset="Accession").reset_index(),
-                                        stubnames="Intensity",i="Accession",j="Sample",suffix=".*").reset_index()
+            long_data = pd.melt(renamed_data,id_vars="Accession",var_name="Sample",value_name="Intensity").reset_index()
             print(long_data)
             
             # if plot_options["agg_groups"]:
@@ -2670,17 +2670,17 @@ class SCP_plotter:
                 any_dropped = False
                 for eachGroup in group_names:
                     size = pivoted_data.loc[pivoted_data["Group"]==eachGroup,col].dropna().shape[0]
-                    if size <= 3:
+                    if size <= 2:
                         any_dropped = True
 
                 if (not any_dropped == True):
-                    pvalues.append(anova(*[pivoted_data.loc[pivoted_data["Group"]==x,col] for x in group_names])[0])
-                    means.append([np.nanmean(pivoted_data.loc[pivoted_data["Group"]==x,col]) for x in group_names])
+                    pvalues.append(anova(*[pivoted_data.loc[pivoted_data["Group"]==x,col].dropna() for x in group_names])[0])
+                    means.append([np.nanmean(pivoted_data.loc[pivoted_data["Group"]==x,col].dropna()) for x in group_names])
                     # print()
                 else:
                     pvalues.append(np.nan)
                     means.append([np.nan])
-                    print("*",sep="")
+                    print("*",end="")
 
             fold_changes = []
             # print(means)
