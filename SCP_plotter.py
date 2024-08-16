@@ -2577,11 +2577,11 @@ class SCP_plotter:
             normalized_data = self.processor.NormalizeToMedian(
                 current_condition_data["protein_abundance"],apply_log2=False) #apply this later
             if self.processor.data_type == "TMT":
-                toFileDict = dict(zip(data_object["run_metadata"]["Channel Identifier"],
-                                [eachGroup + "_#" + str(i) for i in range(len(data_object["run_metadata"]["Channel Identifier"]))]))
+                toFileDict = dict(zip(current_condition_data["run_metadata"]["Channel Identifier"],
+                                [eachGroup + "_#" + str(i) for i in range(len(current_condition_data["run_metadata"]["Channel Identifier"]))]))
             elif self.processor.data_type == "LF":
-                toFileDict = dict(zip(data_object["run_metadata"]["Run Identifier"],
-                                [eachGroup + "_#" + str(i) for i in range(len(data_object["run_metadata"]["Run Identifier"]))]))
+                toFileDict = dict(zip(current_condition_data["run_metadata"]["Run Identifier"],
+                                [eachGroup + "_#" + str(i) for i in range(len(current_condition_data["run_metadata"]["Run Identifier"]))]))
             print(toFileDict)
             toFileDict = self.processor.generate_column_to_name_mapping(normalized_data.columns, toFileDict)
             normalized_data.rename(columns = toFileDict,inplace=True)
@@ -2632,8 +2632,8 @@ class SCP_plotter:
 
             # print(combined_heatmap_data)
         if self.write_output == True or plot_options["significant_only"] == True:
-            print(normalized_data)
-            print(combined_heatmap_data)
+            # print(normalized_data)
+            # print(combined_heatmap_data)
             # How to transpose :(
             # detect differentially expressed proteins
             # reformat dataframe
@@ -2647,7 +2647,7 @@ class SCP_plotter:
             renamed_data.columns = new_names
             # display(combined_heatmap_data)
             print(renamed_data)
-            long_data = pd.wide_to_long(renamed_data.reset_index(),
+            long_data = pd.wide_to_long(renamed_data.drop_duplicates(subset="Accession").reset_index(),
                                         stubnames="Intensity",i="Accession",j="Sample",suffix=".*").reset_index()
             print(long_data)
             
@@ -2667,13 +2667,20 @@ class SCP_plotter:
             pvalues = []
             means = []
             for col in pivoted_data.columns.drop(["Group","Sample"]):
-                if (pivoted_data[col].dropna().shape[0]>=2):
-                    pvalues.append(anova(*[pivoted_data.loc[pivoted_data["Group"]==x,col].dropna() for x in group_names])[0])
-                    means.append([np.nanmean(pivoted_data.loc[pivoted_data["Group"]==x,col].dropna()) for x in group_names])
+                any_dropped = False
+                for eachGroup in group_names:
+                    size = pivoted_data.loc[pivoted_data["Group"]==eachGroup,col].dropna().shape[0]
+                    if size <= 3:
+                        any_dropped = True
+
+                if (not any_dropped == True):
+                    pvalues.append(anova(*[pivoted_data.loc[pivoted_data["Group"]==x,col] for x in group_names])[0])
+                    means.append([np.nanmean(pivoted_data.loc[pivoted_data["Group"]==x,col]) for x in group_names])
                     # print()
                 else:
                     pvalues.append(np.nan)
                     means.append([np.nan])
+                    print("*",sep="")
 
             fold_changes = []
             # print(means)
@@ -2702,6 +2709,9 @@ class SCP_plotter:
                         if current_p < alpha and abs(np.log2(each_FC)) > log_min_FC:
                             current = True
                 significances.append(current)
+            # print(len(pvalues))
+            # print(combined_heatmap_data.shape)
+            combined_heatmap_data = combined_heatmap_data.drop_duplicates(subset="Accession").reset_index()
             combined_heatmap_data["adjusted_p_values"] = multipletests(pvalues, method='fdr_bh')[1] #adjust 
             combined_heatmap_data["fold_changes"] = fold_changes
             combined_heatmap_data["significant"] = significances
