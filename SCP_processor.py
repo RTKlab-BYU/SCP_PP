@@ -9,7 +9,7 @@ from scipy.stats import ttest_ind_from_stats
 import json
 
 class SCP_processor:
-    def __init__(self, ignore_peptides = False, ignore_proteins = False,min_peptides=1, data_type = "LF") -> None:
+    def __init__(self, ignore_peptides=False, ignore_proteins=False, min_peptides=1, data_type = "LF") -> None:
         self.min_unique_peptides = min_peptides
         self.ignore_peptides = ignore_peptides
         self.ignore_proteins = ignore_proteins
@@ -18,7 +18,6 @@ class SCP_processor:
     def sumIDs(self,IDMatrix):
         """_summarize the ID matrix infor into ID summary_
         
-
         Args:
             IDMatrix (_type_): _protein or pepetides matrix_
             0 Accession/Annotated Sequence 	run1 	run2 	run3 
@@ -53,8 +52,7 @@ class SCP_processor:
                     total_ID_each = len(currentMatrix[currentMatrix.isin(["MS2"]).any(axis=1)]) + len(currentMatrix[currentMatrix.isin(["MBR"]).any(axis=1)])
                 total_ID.append(total_ID_each)
         else:
-            runs = [col for col in IDMatrix.columns if not any(
-                substring in col for substring in [
+            runs = [col for col in IDMatrix.columns if not any(substring in col for substring in [
                     'Accession', 'Annotated Sequence'])]
             #put each ID_Modes into a list
             returnNames = []
@@ -71,6 +69,7 @@ class SCP_processor:
                         eachColumn][IDMatrix[eachColumn] == "MBR"])
                 total_ID.append(total_ID_each)
 
+
         return pd.DataFrame({'names': runs,
                             'MS2_IDs': MS2_ID,
                             'MBR_IDs': MBR_ID,
@@ -86,12 +85,20 @@ class SCP_processor:
                     break
         return column_name_mapping
 
-    def generate_column_to_name_mapping(self,columns, partial_column_name_mapping):
-        #input is column names, and a dictionary with what you want each column (key) to be renamed to (value)
+    def generate_column_to_name_mapping(self, columns, partial_column_name_mapping):
+        """Generates a dictionary that maps column names to a new name
+        
+        Parameters:
+        columns (lst): List of current column names
+        partial_column_name_mapping (dict): Map of each column (key) to be renamed to (value)
+
+        Returns
+        column_name_mapping (dict): Map of each column (key) and its new name (value)
+        """
         column_name_mapping = {}
         for col in columns:
             for key, value in partial_column_name_mapping.items():
-                if key == col:  #after we get away from PD's weirdness, then we want exact matches,
+                if key in col:  #after we get away from PD's weirdness, then we want exact matches,
                                 #so we don't get for example 1-11 when we look for 1-1 for file Identifiers or filenames
                     column_name_mapping[col] = value
                     break
@@ -113,25 +120,46 @@ class SCP_processor:
         #         all_matrix.loc[(all_matrix[name].isin(MS2_matrix[name]) & (MS2_matrix[eachColumn] == "MS2")), [eachColumn]] = MS2_matrix[[eachColumn]]
 
         all_keys = pd.merge(all_matrix[name], MS2_matrix[name],how="outer")
-        # print(all_keys)
-
         all_matrix = pd.merge(all_matrix, all_keys, how="right").replace("ID","MBR")
         MS2_matrix = pd.merge(MS2_matrix, all_keys, how="right")
 
-        # print(all_matrix)
         for eachColumn in id_cols:
-            # print(len(all_matrix[eachColumn]))
-            # print(len(MS2_matrix[eachColumn]))
             if len(all_matrix[(all_matrix[name].isin(MS2_matrix[name]) & (MS2_matrix[eachColumn] == "MS2"))]) > 0:
                 all_matrix.loc[(all_matrix[name].isin(MS2_matrix[name]) & (MS2_matrix[eachColumn] == "MS2")), [eachColumn]] = "MS2"
 
-        # print(all_matrix)
+        return all_matrix 
 
-        return all_matrix #noticed this changed
 
-    def read_file(self,queue_id=None, queue_info= None, processor_info = None,
-                input1=None, input2=None,input3=None, input4=None, input5=None,
-                process_app = None, file_id = 1, USE_MaxLFQ = False, this_organism = None):
+    def combine_diann_IDs(self, all_matrix, MS2_matrix):
+        # make IDs into MBR
+        id_cols = all_matrix.columns.tolist()
+
+        if "Annotated Sequence" in all_matrix.columns:
+            name = "Annotated Sequence"
+            id_cols.remove("Precursor.Charge")
+            all_keys = pd.merge(all_matrix[[name, "Precursor.Charge"]], MS2_matrix[[name, "Precursor.Charge"]], how="outer")
+            all_matrix = pd.merge(all_matrix, all_keys, how="right").replace("ID","MBR")
+            MS2_matrix = pd.merge(MS2_matrix, all_keys, how="right")
+
+        elif "Accession" in all_matrix.columns:  
+            name = "Accession"
+            id_cols.remove("Protein.Names")
+            all_keys = pd.merge(all_matrix[[name, "Protein.Names"]], MS2_matrix[[name, "Protein.Names"]], how="outer")
+            all_matrix = pd.merge(all_matrix, all_keys, how="right").replace("ID","MBR")
+            MS2_matrix = pd.merge(MS2_matrix, all_keys, how="right")
+    
+        id_cols.remove(name)
+        for eachColumn in id_cols:
+            if len(all_matrix[(all_matrix[name].isin(MS2_matrix[name]) & (MS2_matrix[eachColumn] == "MS2"))]) > 0:
+                all_matrix.loc[(all_matrix[name].isin(MS2_matrix[name]) & (MS2_matrix[eachColumn] == "MS2")), [eachColumn]] = "MS2"
+
+        return all_matrix
+
+
+
+    def read_file(self,queue_id=None, queue_info=None, processor_info=None,
+                input1=None, input2=None, input3=None, input4=None, input5=None,
+                process_app=None, file_id=1, USE_MaxLFQ=False, this_organism=None):
         """_Read data from data manager API or through local files or read directly
         in the webapp_
         Args:
@@ -212,14 +240,14 @@ class SCP_processor:
                     if pep_ID[col].dtype != 'object': # Check if not a string column
                         pep_ID[col].replace(0, np.nan, inplace=True)
                         # Replace all numerical values to ID
-                        pep_ID[col] = pep_ID[col].astype(str).str.replace("\d+\.\d+", "ID", regex=True)
+                        pep_ID[col] = pep_ID[col].astype(str).str.replace(r"\d+\.\d+", "ID", regex=True)
                 #Rename protein numbers
                 cols = [col for col in pep_ID_MS2.columns if col != 'Annotated Sequence	']
                 for col in cols:
                     if pep_ID_MS2[col].dtype != 'object': # Check if not a string column
                         pep_ID_MS2[col].replace(0, np.nan, inplace=True)
                         # Replace all numerical values to ID
-                        pep_ID_MS2[col] = pep_ID_MS2[col].astype(str).str.replace("\d+\.\d+", "MS2", regex=True)
+                        pep_ID_MS2[col] = pep_ID_MS2[col].astype(str).str.replace(r"\d+\.\d+", "MS2", regex=True)
 
                 # print(run_name_list)
                 pep_ID = self.combine_IDs(pep_ID, pep_ID_MS2)
@@ -289,7 +317,7 @@ class SCP_processor:
                     if prot_ID[col].dtype != 'object': # Check if not a string column
                         prot_ID[col].replace(0, np.nan, inplace=True)
                         # Replace all numerical values to ID
-                        prot_ID[col] = prot_ID[col].astype(str).str.replace("\d+\.\d+", "ID", regex=True)
+                        prot_ID[col] = prot_ID[col].astype(str).str.replace(r"\d+\.\d+", "ID", regex=True)
                             
             
                 cols = [col for col in prot_ID_MS2.columns if col != 'Accession']
@@ -297,7 +325,7 @@ class SCP_processor:
                     if prot_ID_MS2[col].dtype != 'object': # Check if not a string column
                         prot_ID_MS2[col].replace(0, np.nan, inplace=True)
                         # Replace all numerical values to ID
-                        prot_ID_MS2[col] = prot_ID_MS2[col].astype(str).str.replace("\d+\.\d+", "MS2", regex=True)
+                        prot_ID_MS2[col] = prot_ID_MS2[col].astype(str).str.replace(r"\d+\.\d+", "MS2", regex=True)
                 
                 prot_ID = self.combine_IDs(prot_ID, prot_ID_MS2)
 
@@ -417,36 +445,46 @@ class SCP_processor:
             run_name_list['Run Identifier'] = run_name_list.index.to_series().apply(lambda x: str(file_id) + "-" + str(x))
             
         elif "DIANN_LF" in process_app:
-            # read in DIANN output files
-            if self.ignore_peptides == False:
+            ## Peptides
+            if self.ignore_peptides is False:
+
+                # read in DIANN output files
                 peptide_table = pd.read_table(input2,low_memory=False)
                 if this_organism != None:
                     peptide_table = peptide_table.loc[peptide_table["Protein.Names"].str.endswith("_"+this_organism)]
+                # We currently do not have a MS2 file
                 peptide_table_MS2 = pd.read_table(input4,low_memory=False)
                 if this_organism != None:
                     peptide_table_MS2 = peptide_table_MS2.loc[peptide_table_MS2["Protein.Names"].str.endswith("_"+this_organism)]
-                pep_other_info = pd.DataFrame({"Mapped Proteins": peptide_table["Protein.Group"], "Modified.Sequence": peptide_table["Modified.Sequence"]})
+
+                # Creates a new data frame
+                pep_other_info = pd.DataFrame({"Mapped Proteins": peptide_table["Protein.Group"], "Annotated Sequence": peptide_table["Modified.Sequence"]})
                 pep_other_info["Source_File"] = "None"
-                peptide_table= peptide_table[~peptide_table['Protein.Group'].str.contains(
-                "contam", na=False)]
-                peptide_table_MS2= peptide_table_MS2[~peptide_table_MS2['Protein.Group'].str.contains(
-                "contam", na=False)]
-                pep_other_info= pep_other_info[~pep_other_info['Mapped Proteins'].str.contains(
-                "contam", na=False)]
-                pep_other_info.rename(columns={'Modified.Sequence': 'Annotated Sequence'}, inplace=True)
-                # Replace backslashes with forward slashes if data comes from Windows
+
+                # Filters out proteins with "contam" or that are null
+                peptide_table= peptide_table[~peptide_table['Protein.Group'].str.contains("contam", na=False)]
+                peptide_table_MS2= peptide_table_MS2[~peptide_table_MS2['Protein.Group'].str.contains("contam", na=False)]
+                pep_other_info= pep_other_info[~pep_other_info['Mapped Proteins'].str.contains("contam", na=False)]
+
+                # I changed the name in the creation of pep_other_info
+                # pep_other_info.rename(columns={'Modified.Sequence': 'Annotated Sequence'}, inplace=True)
+                
+                # # Replace backslashes with forward slashes if data comes from Windows
                 # meta_table['File Name'] = meta_table['File Name'].str.replace('\\', '/', regex=False)
                 # # Apply a lambda function to extract file names without extensions
                 # meta_table['File Name'] = meta_table['File Name'].apply(lambda x: os.path.splitext(os.path.basename(x))[0])
                 # run_name_list = meta_table['File Name'].tolist()
                 # run_name_list = pd.DataFrame({"Run Names": run_name_list})
                 # run_name_list['Run Identifier'] = run_name_list.index.to_series().apply(lambda x: str(file_id) + "-" + str(x))
-                ## Peptides
-                peptide_path_cols = peptide_table_MS2.filter(regex='\\\\|Modified.Sequence').columns
+               
+                # Separate the columns of just "Modified.Sequence" and file names
+                peptide_path_cols = peptide_table_MS2.filter(regex='\\\\|Modified.Sequence|Precursor.Charge').columns
+
+                # Create data frames that are just the columns with "Modified.Sequence" or a filename
                 pep_abundance = peptide_table.loc[:, peptide_path_cols]
                 pep_abundance_MS2 = peptide_table_MS2.loc[:, peptide_path_cols]
-                # Rename Columns to remove file path
-                file_path_cols = peptide_table.filter(regex='\\\\').columns
+
+                # Rename the column "Modified.Sequence" to "Annotated Sequence"
                 if this_organism != None:
                     pep_abundance.columns = [os.path.splitext(os.path.basename(x))[0]+"_"+this_organism if x in file_path_cols else x for x in pep_abundance.columns]
                 pep_abundance = pep_abundance.rename(columns={'Modified.Sequence': 'Annotated Sequence'})
@@ -454,97 +492,150 @@ class SCP_processor:
                     pep_abundance_MS2.columns = [os.path.splitext(os.path.basename(x))[0]+"_"+this_organism if x in file_path_cols else x for x in pep_abundance_MS2.columns]
                 pep_abundance_MS2 = pep_abundance_MS2.rename(columns={'Modified.Sequence': 'Annotated Sequence'})
 
-                run_name_list = pd.DataFrame(data={"Run Names": [os.path.splitext(os.path.basename(x))[0] for x in file_path_cols]})
+                # Create a list of just the file names
+                file_path_cols = peptide_table.filter(regex='\\\\').columns
+
+                # Creates a data frame of just the file names (no .raw)
+                run_name_list = pd.DataFrame(data={"Run Names": [os.path.splitext(x)[0] for x in file_path_cols]})
+
+                # Creates a new column in the data frame that is used to identify the run by the index of the data frame
                 run_name_list['Run Identifier'] = run_name_list.index.to_series().apply(lambda x: str(file_id) + "-" + str(x))
 
+                # Rename the file columns of pep_abundance to be just the run names (no .raw) 
                 for item in [pep_abundance,pep_abundance_MS2]:
-                    # Generate a new column name mapping using the function
-                    fileid_mapping = self.generate_column_to_name_mapping(item.columns, dict(zip(run_name_list["Run Names"],run_name_list["Run Identifier"])))
-                    item.rename(columns = fileid_mapping,inplace=True)
+                    # Yes it is reduntant to make partial_column_name_mapping, but it is to use the function generate_col...
+                    filename_to_identifier_map = dict(zip(run_name_list["Run Names"],run_name_list["Run Identifier"]))
+                    # filename_to_filename_map = {name: name for name in run_name_list["Run Names"]}
+                    run_name_mapping = self.generate_column_to_name_mapping(item.columns, filename_to_identifier_map)
+                    item.rename(columns = run_name_mapping, inplace=True)
 
+                # Analyze peptide ID
+                # Create a copy of pep_abundance to manipulate
                 pep_ID = pep_abundance.copy()
-                cols = [col for col in pep_ID.columns if col != 'Accession']
-                for col in cols:
-                    if pep_ID[col].dtype != 'object': # Check if not a string column
-                        pep_ID[col].replace(0, np.nan, inplace=True)
-                        # Replace all numerical values to ID
-                        pep_ID[col] = pep_ID[col].astype(str).str.replace("\d+\.\d+", "ID", regex=True)
-                pep_ID_MS2 = pep_abundance_MS2.copy()
-                cols = [col for col in pep_ID_MS2.columns if col != 'Accession']
-                for col in cols:
-                    if pep_ID_MS2[col].dtype != 'object': # Check if not a string column
-                        pep_ID_MS2[col].replace(0, np.nan, inplace=True)
-                        # Replace all numerical values to ID
-                        pep_ID_MS2[col] = pep_ID_MS2[col].astype(str).str.replace("\d+\.\d+", "MS2", regex=True)
-                pep_ID = self.combine_IDs(pep_ID, pep_ID_MS2)
-                
+                pep_abundance.drop(["Precursor.Charge"], axis=1, inplace=True)
 
-            if self.ignore_proteins == False:
+                # Create a list of columns, but ignore the "Annotated Sequence" column
+                cols = [col for col in pep_ID.columns if col != 'Annotated Sequence' and col != "Precursor.Charge"]
+
+                # For all of the columns
+                for col in cols:
+                    # If the column is not an "object" type (if it is not a string)
+                    if pep_ID[col].dtype != 'object':
+                        # Replace all 0's with NaN
+                        pep_ID[col] = pep_ID[col].replace(0, np.nan)
+                        # Replace all numerical values (floats, ints, and exponentials) to ID
+                        pep_ID[col] = pep_ID[col].astype(str).str.replace(r"\b\d+(\.\d*)?([eE][-+]?\d+)?\b", "ID", regex=True)
+
+                # Repeat the process above with MS2
+                pep_ID_MS2 = pep_abundance_MS2.copy()
+                pep_abundance_MS2.drop(["Precursor.Charge"], axis=1, inplace=True)
+                cols = [col for col in pep_ID_MS2.columns if col != 'Annotated Sequence' and col != "Precursor.Charge"]
+                for col in cols:
+                    if pep_ID_MS2[col].dtype != 'object': 
+                        pep_ID_MS2[col] = pep_ID_MS2[col].replace(0, np.nan)
+                        pep_ID_MS2[col] = pep_ID_MS2[col].astype(str).str.replace(r"\b\d+(\.\d*)?([eE][-+]?\d+)?\b", "MS2", regex=True)
+                
+                # Returns a combination of the MS2 and normal data.
+                # There is a "MS2" when a run has data for a peptide in the MS2 
+                # There is an "MBR" when a run has data for a peptide in just the normal data
+                pep_ID = self.combine_diann_IDs(pep_ID, pep_ID_MS2)
+                pep_ID.drop(["Precursor.Charge"], axis=1, inplace=True)
+
+
+                
+            ## Proteins
+            if self.ignore_proteins is False:
+
+                # Read in DIANN output files (normal)
                 protein_table = pd.read_table(input1,low_memory=False)
                 if this_organism != None:
                     protein_table = protein_table.loc[protein_table["Protein.Names"].str.endswith("_"+this_organism)]
+
+                # Read in DIANN output files (normal)
                 protein_table_MS2 = pd.read_table(input3,low_memory=False)
                 if this_organism != None:
                     protein_table_MS2 = protein_table_MS2.loc[protein_table_MS2["Protein.Names"].str.endswith("_"+this_organism)]
                     
-                prot_other_info = pd.DataFrame({"Protein": protein_table["Genes"], "Protein.Group": protein_table["Protein.Group"]})
-
+                # Create a new data frame with just the Genes and Protein.Group columns
+                prot_other_info = pd.DataFrame({"Accession": protein_table["Genes"], "Protein.Group": protein_table["Protein.Group"]})
                 prot_other_info["Source_File"] = "None"
 
                 # meta_table = pd.read_csv(input5, sep=' ', header=None, names=["File Name"])
+
                 # filter Contaminant
-                protein_table= protein_table[~protein_table['Protein.Group'].str.contains(
-                    "contam", na=False)]
-                protein_table_MS2= protein_table_MS2[~protein_table_MS2['Protein.Group'].str.contains(
-                    "contam", na=False)]
+                protein_table= protein_table[~protein_table['Protein.Group'].str.contains("contam", na=False)]
+                protein_table_MS2= protein_table_MS2[~protein_table_MS2['Protein.Group'].str.contains("contam", na=False)]
+                prot_other_info= prot_other_info[~prot_other_info['Accession'].str.contains("contam", na=False)]
             
-                prot_other_info= prot_other_info[~prot_other_info['Protein'].str.contains(
-                    "contam", na=False)]
-            
-            
-                prot_other_info.rename(columns={'Protein': 'Accession'}, inplace=True)
+                # Alex took out, changed name in creation of prot_other_info
+                # prot_other_info.rename(columns={'Protein': 'Accession'}, inplace=True)
 
-            # Get the file names from the meta table
-                protein_path_cols = protein_table_MS2.filter(regex='\\\\|Genes').columns
+                # Get the file names from the meta table
+                protein_path_cols = protein_table_MS2.filter(regex='\\\\|Genes|Protein.Names').columns
 
-                ## Proteins
+                # Create data frames that are just the columns with "Genes" or a filename
                 prot_abundance = protein_table.loc[:, protein_path_cols]
                 prot_abundance_MS2 = protein_table_MS2.loc[:, protein_path_cols]
-                # Rename Columns to remove file path
+
+                # Create a list of just the file names
                 file_path_cols = protein_table.filter(regex='\\\\').columns
+
+                # Changes the columns of prot_abundance to the path/filename (no .raw)
                 prot_abundance.columns = [os.path.splitext(os.path.basename(x))[0] if x in file_path_cols else x for x in prot_abundance.columns]
+                prot_abundance_MS2.columns = [os.path.splitext(os.path.basename(x))[0] if x in file_path_cols else x for x in prot_abundance_MS2.columns]
+
+                # Rename Genes to Accession, and removes ";----" from the column
                 prot_abundance = prot_abundance.rename(columns={'Genes': 'Accession'})
                 prot_abundance["Accession"] =  prot_abundance["Accession"].str.replace(";.*","",regex = True)
-                prot_abundance_MS2.columns = [os.path.splitext(os.path.basename(x))[0] if x in file_path_cols else x for x in prot_abundance_MS2.columns]
                 prot_abundance_MS2 = prot_abundance_MS2.rename(columns={'Genes': 'Accession'})   
                 prot_abundance_MS2["Accession"] =  prot_abundance_MS2["Accession"].str.replace(";.*","",regex = True)
 
+                # Create a new data frame with just the file names and the run identifier "0-n"
                 run_name_list = pd.DataFrame(data={"Run Names": [os.path.splitext(os.path.basename(x))[0] for x in file_path_cols]})
                 run_name_list['Run Identifier'] = run_name_list.index.to_series().apply(lambda x: str(file_id) + "-" + str(x))
 
-                for item in [prot_abundance,prot_abundance_MS2]:
+                for item in [prot_abundance, prot_abundance_MS2]:
                     # Generate a new column name mapping using the function
-                    fileid_mapping = self.generate_column_to_name_mapping(item.columns, dict(zip(run_name_list["Run Names"],run_name_list["Run Identifier"])))
-                    item.rename(columns = fileid_mapping,inplace=True)
+                    filename_to_identifier_map = dict(zip(run_name_list["Run Names"], run_name_list["Run Identifier"]))
+                    # filename_to_filename_map = {name: name for name in run_name_list["Run Names"]}
+                    fileid_mapping = self.generate_column_to_name_mapping(item.columns, filename_to_identifier_map)
+                    item.rename(columns=fileid_mapping, inplace=True)
 
 
-            #convert to str for IDs matrix
+            # Analyze Protein ID
+                # Create a copy of prot_abundance to manipulate
                 prot_ID = prot_abundance.copy()
-                cols = [col for col in prot_ID.columns if col != 'Accession']
-                for col in cols:
-                    if prot_ID[col].dtype != 'object': # Check if not a string column
-                        prot_ID[col].replace(0, np.nan, inplace=True)
-                        # Replace all numerical values to ID
-                        prot_ID[col] = prot_ID[col].astype(str).str.replace("\d+\.*\d+", "ID", regex=True)
-                prot_ID_MS2 = prot_abundance_MS2.copy()
-                cols = [col for col in prot_ID_MS2.columns if col != 'Accession']
-                for col in cols:
-                    if prot_ID_MS2[col].dtype != 'object': # Check if not a string column
-                        prot_ID_MS2[col].replace(0, np.nan, inplace=True)
-                        # Replace all numerical values to ID
-                        prot_ID_MS2[col] = prot_ID_MS2[col].astype(str).str.replace("\d+\.*\d+", "MS2", regex=True)
+                prot_abundance.drop(["Protein.Names"], axis=1, inplace=True)
 
-                prot_ID = self.combine_IDs(prot_ID, prot_ID_MS2)       
+                # Create a list of columns, but ignore the "Accession" column
+                cols = [col for col in prot_ID.columns if col != 'Accession' and col != "Protein.Names"]
+
+                # For all of the columns
+                for col in cols:
+                    # If the column is not an "object" type (if it is not a string)
+                    if prot_ID[col].dtype != 'object':
+                        # Replace all 0's with NaN
+                        prot_ID[col] = prot_ID[col].replace(0, np.nan)
+                        # Replace all numerical values (floats, ints, and exponentials) to ID
+                        prot_ID[col] = prot_ID[col].astype(str).str.replace(r"\b\d+(\.\d*)?([eE][-+]?\d+)?\b", "ID", regex=True)
+
+                # Repeat the the process above with MS2
+                prot_ID_MS2 = prot_abundance_MS2.copy()
+                prot_abundance_MS2.drop(["Protein.Names"], axis=1, inplace=True)
+                cols = [col for col in prot_ID_MS2.columns if col != 'Accession' and col != "Protein.Names"]
+                for col in cols:
+                    if prot_ID_MS2[col].dtype != 'object':
+                        prot_ID_MS2[col] = prot_ID_MS2[col].replace(0, np.nan)
+                        prot_ID_MS2[col] = prot_ID_MS2[col].astype(str).str.replace(r"\b\d+(\.\d*)?([eE][-+]?\d+)?\b", "MS2", regex=True)
+
+
+                # Returns a combination of the MS2 and normal data.
+                # There is a "MS2" when a run has data for a peptide in the MS2 
+                # There is an "MBR" when a run has data for a peptide in just the normal data
+                prot_ID = self.combine_diann_IDs(prot_ID, prot_ID_MS2)   
+                prot_ID.drop(["Protein.Names"], axis=1, inplace=True)
+                print("did protein")
+
             
         elif "FragPipe_TMT" in process_app:     # fragpipe results
             # read data
@@ -591,13 +682,13 @@ class SCP_processor:
                     if pep_ID[col].dtype != 'object': # Check if not a string column
                         pep_ID[col].replace(0, np.nan, inplace=True)
                         # Replace all numerical values to ID
-                        pep_ID[col] = pep_ID[col].astype(str).str.replace("\d+\.\d+", "ID", regex=True)
+                        pep_ID[col] = pep_ID[col].astype(str).str.replace(r"\d+\.\d+", "ID", regex=True)
                 cols = [col for col in pep_ID_MS2.columns if col != 'Annotated Sequence	']
                 for col in cols:
                     if pep_ID_MS2[col].dtype != 'object': # Check if not a string column
                         pep_ID_MS2[col].replace(0, np.nan, inplace=True)
                         # Replace all numerical values to ID
-                        pep_ID_MS2[col] = pep_ID_MS2[col].astype(str).str.replace("\d+\.\d+", "MS2", regex=True)
+                        pep_ID_MS2[col] = pep_ID_MS2[col].astype(str).str.replace(r"\d+\.\d+", "MS2", regex=True)
                 pep_ID = self.combine_IDs(pep_ID, pep_ID_MS2)
                 pep_other_info["Source_File"] = input2  
 
@@ -651,7 +742,7 @@ class SCP_processor:
                     if prot_ID[col].dtype != 'object': # Check if not a string column
                         prot_ID[col].replace(0, np.nan, inplace=True)
                         # Replace all numerical values to ID
-                        prot_ID[col] = prot_ID[col].astype(str).str.replace("\d+\.\d+", "ID", regex=True)
+                        prot_ID[col] = prot_ID[col].astype(str).str.replace(r"\d+\.\d+", "ID", regex=True)
                 pep_ID = pep_abundance.copy()
             #Rename protein numbers
             
@@ -660,7 +751,7 @@ class SCP_processor:
                     if prot_ID_MS2[col].dtype != 'object': # Check if not a string column
                         prot_ID_MS2[col].replace(0, np.nan, inplace=True)
                         # Replace all numerical values to ID
-                        prot_ID_MS2[col] = prot_ID_MS2[col].astype(str).str.replace("\d+\.\d+", "MS2", regex=True)
+                        prot_ID_MS2[col] = prot_ID_MS2[col].astype(str).str.replace(r"\d+\.\d+", "MS2", regex=True)
             
             # print(run_name_list)
                 prot_ID = self.combine_IDs(prot_ID, prot_ID_MS2)    
@@ -802,27 +893,37 @@ class SCP_processor:
         #     peptide_ID_summary = self.sumIDs(pep_ID)
         
         
-        #sets the processing app in run_name_list
+        # Creates a column in run_name_list for the processing app 
         run_name_list["Processing App"] = process_app
 
-
         return_matrix = {'run_metadata': run_name_list}  
-        if self.ignore_peptides == False:
-            peptide_ID_summary = self.sumIDs(pep_ID)   
+        if self.ignore_peptides is False:
+            peptide_ID_summary = self.sumIDs(pep_ID)  
             return_matrix['peptide_other_info']=  pep_other_info
             return_matrix['peptide_abundance']=  pep_abundance
             return_matrix['peptide_ID_matrix']=  pep_ID
             return_matrix['peptide_ID_Summary']=  peptide_ID_summary
-        if self.ignore_proteins == False:
+
+            pep_other_info.to_csv("pep_other_info.tsv", sep="\t")
+            pep_abundance.to_csv("pep_abundance.tsv", sep="\t")
+            pep_ID.to_csv("pep_ID.tsv", sep="\t")
+            peptide_ID_summary.to_csv("peptide_ID_summary.tsv", sep="\t")
+
+        if self.ignore_proteins is False:
             protein_ID_summary = self.sumIDs(prot_ID)
             return_matrix['protein_other_info']= prot_other_info
             return_matrix['protein_abundance']=  prot_abundance
             return_matrix['protein_ID_matrix']=  prot_ID
             return_matrix['protein_ID_Summary']=  protein_ID_summary
+
+            prot_other_info.to_csv("prot_other_info.tsv", sep="\t")
+            prot_abundance.to_csv("prot_abundance.tsv", sep="\t")
+            prot_ID.to_csv("prot_ID.tsv", sep="\t")
+            protein_ID_summary.to_csv("protein_ID_summary.tsv", sep="\t")
         return return_matrix
 
-    def read_files(self,queue_ids = None, queue_info = None, processor_info = None, 
-                   grouped_input_files = [], organisms = [None]):
+    def read_files(self, queue_ids=None, queue_info=None, processor_info=None, 
+                   grouped_input_files=[], organisms=[None]):
         '''
         Creates a list of data objects
         
@@ -849,7 +950,6 @@ class SCP_processor:
         ]
         '''
 
-
         data_objects = []
 
         i = 0
@@ -865,14 +965,12 @@ class SCP_processor:
                 input5= eachGroup["input5"]
 
             for each_organism in organisms:
-                current_data_object = self.read_file(this_organism=each_organism,input1=input1,input2=input2,
-                                                input3=input3,input4 = input4,
-                                                input5=input5, process_app=process_app,file_id = i)
+                current_data_object = self.read_file(this_organism=each_organism, input1=input1, input2=input2,
+                                                    input3=input3, input4=input4, input5=input5, 
+                                                    process_app=process_app, file_id=i)
                 data_objects.append(current_data_object)
-                # print(current_data_object["protein_abundance"])
                 i = i + 1
-            
-        
+
         return data_objects
 
 
@@ -889,17 +987,17 @@ class SCP_processor:
                 first_file = False
                 final_data_object = eachDataObject
             else:
-                final_data_object['run_metadata'] = pd.concat([final_data_object['run_metadata'],eachDataObject['run_metadata']]).reset_index(drop=True)
-                if self.ignore_proteins == False:
+                final_data_object['run_metadata'] = pd.concat([final_data_object['run_metadata'], eachDataObject['run_metadata']]).reset_index(drop=True)
+                if self.ignore_proteins is False:
                     final_data_object['protein_other_info'] = eachDataObject["protein_abundance"][["Accession"]]
-                    final_data_object['protein_ID_Summary'] = pd.concat([final_data_object['protein_ID_Summary'],eachDataObject['protein_ID_Summary']]).reset_index(drop=True)
-                if self.ignore_peptides == False:
+                    final_data_object['protein_ID_Summary'] = pd.concat([final_data_object['protein_ID_Summary'], eachDataObject['protein_ID_Summary']]).reset_index(drop=True)
+                if self.ignore_peptides is False:
                     final_data_object['peptide_other_info'] = eachDataObject["peptide_abundance"][["Annotated Sequence"]]
-                    final_data_object['peptide_ID_Summary'] = pd.concat([final_data_object['peptide_ID_Summary'],eachDataObject['peptide_ID_Summary']]).reset_index(drop=True)
+                    final_data_object['peptide_ID_Summary'] = pd.concat([final_data_object['peptide_ID_Summary'], eachDataObject['peptide_ID_Summary']]).reset_index(drop=True)
                 duplicates_found = False
                 
                 #loop through to see if there are any duplicate files
-                if self.ignore_proteins == False:
+                if self.ignore_proteins is False:
                     bad_cols = [eachCol for eachCol in final_data_object['protein_abundance'].loc[:, final_data_object['protein_abundance'].columns!='Accession'].columns if eachCol in eachDataObject["protein_abundance"]]
                     eachDataObject["protein_abundance"] =  eachDataObject["protein_abundance"].drop(bad_cols,axis=1)
                     
@@ -919,7 +1017,10 @@ class SCP_processor:
 
     def sort_runs(self, data_object, settings_file):
         
-        settings_table = pd.read_table(settings_file,sep="\t")
+        # Read the settings file
+        settings_table = pd.read_table(settings_file, sep="\t")
+
+        # Create a dictionary with the settings file {Condition: {column_head : value}}
         saved_settings = settings_table.set_index("Conditions").to_dict(orient="index")
         #any run with any of the filter_out items will not be used.
 
@@ -928,12 +1029,17 @@ class SCP_processor:
         # display(data_obj["protein_ID_Summary"])
         for eachGroup in saved_settings:
             i = 0
+
+            # Create new column, "records"
             saved_settings[eachGroup]["records"] = []
+
+            # Define what to filter out
             filterOutType = type(saved_settings[eachGroup]["filter_out"])
             if filterOutType == str or filterOutType == int or filterOutType == float and not pd.isna(saved_settings[eachGroup]["filter_out"]):
                 filterOut = str.split(str(saved_settings[eachGroup]["filter_out"]),sep = ",")
             else:
                 filterOut = ["M@di"]
+            
             if len(str.split(str(saved_settings[eachGroup]["filter_in"]),sep = "@")) > 1: #multiple files, only some have the runs for this group
                 user_list = {}
                 #add all runs from all analyses to be probed
@@ -983,8 +1089,6 @@ class SCP_processor:
         #add the order of each column
         ignore_columns = ["filter_in","filter_out"]
         category_columns = [x for x in settings_table.columns.tolist() if x not in ignore_columns]
-
-
 
         for eachCol in category_columns:
             saved_settings["Order@"+eachCol] = settings_table[eachCol].drop_duplicates().tolist()
@@ -1084,20 +1188,22 @@ class SCP_processor:
             other_info_name = "peptide_other_info"
             abundance_name = "peptide_abundance"
 
-        #initializes number of missing values to zero
+        #initializes a new column "missing values" with all rows equal to zero
         protein_columns = data_object[matrix_name].copy().assign(missingValues=0)
 
         i = 0
         # found all the proteins/peptides with missing values rate below
         # the threshold, pep_columns contains the remaining protein/peptide
         # in a pandas dataframe with $names as its column name
+
+        # For each column associated with the group name (ex Helalib) except Accession/Annotated Sequence
         for each_column in data_object[matrix_name].loc[
                 :, ~data_object[matrix_name].columns.str.contains(
                     name)].columns:
             # replace "nan" to np.nan
             protein_columns = protein_columns.replace({"nan": np.nan}) 
-            #find missing values and increment those rows (a row is a protein/peptide) total number of missing values
 
+            #find missing values and increment those rows (a row is a protein/peptide) total number of missing values
             protein_columns.loc[(protein_columns[each_column] != "MS2")
                                 &(protein_columns[each_column] != "MBR")
                                 &(protein_columns[each_column] != "ID"), #this is more robust than using nan's in case something fails to convert
@@ -1177,7 +1283,7 @@ class SCP_processor:
 
         protein_columns = data_object[matrix_name].copy()
         protein_columns["missingValues"] = 0
-        print(data_object[matrix_name].shape)
+        # print(data_object[matrix_name].shape)
         i = 0
         # found all the proteins/peptides with missing values rate below
         # the threshold, pep_columns contains the remaining protein/peptide
@@ -1222,7 +1328,7 @@ class SCP_processor:
             data_object[abundance_name] = data_object[abundance_name].dropna(
                 thresh=2, subset=data_object[abundance_name].columns[1:])
             # This will cause the veen diagram to be different from R program
-        print(data_object[matrix_name])
+        # print(data_object[matrix_name])
         
         return data_object
 
@@ -1360,7 +1466,16 @@ class SCP_processor:
         # print(x_imputed.columns)
 
         # Replace the original values in abundance_data with imputed values
-        x_imputed.insert(loc=0,column=name,value=names)
+        # x_imputed.insert(loc=0,column=name,value=names)
+
+        # Check if the column already exists
+        if name in x_imputed.columns:
+            # Update the existing column
+            x_imputed[name] = names
+        else:
+            # Insert the new column
+            x_imputed.insert(loc=0, column=name, value=names)
+        
         return x_imputed
 
     def CalculatePCA(self,abundance_object, infotib,log2T = False):
@@ -1382,7 +1497,7 @@ class SCP_processor:
         x_filtered = x[:, is_finite_col]
 
         
-        # Instantiate PCA    
+        # Instantiate PCA   
         pca = PCA()
         #
         # Determine transformed features
@@ -1508,7 +1623,7 @@ class SCP_processor:
 
 
         filtered_data = {}
-    # filtered_data["meta"] = data_dict["meta"]
+        # filtered_data["meta"] = data_dict["meta"]
         run_id_list.extend(["Annotated Sequence","Accession"])
         identifier_list_plus.extend(["Annotated Sequence","Accession"])
 
@@ -1544,6 +1659,7 @@ class SCP_processor:
             filtered_data["protein_ID_Summary"] = data_dict["protein_ID_Summary"][
                 data_dict["protein_ID_Summary"]["names"].isin(
                     run_id_list)]
+      
         return filtered_data
         
     def filter_by_channel_id(self,data_dict, run_id_list):
