@@ -634,7 +634,6 @@ class SCP_processor:
                 # There is an "MBR" when a run has data for a peptide in just the normal data
                 prot_ID = self.combine_diann_IDs(prot_ID, prot_ID_MS2)   
                 prot_ID.drop(["Protein.Names"], axis=1, inplace=True)
-                print("did protein")
 
             
         elif "FragPipe_TMT" in process_app:     # fragpipe results
@@ -904,11 +903,6 @@ class SCP_processor:
             return_matrix['peptide_ID_matrix']=  pep_ID
             return_matrix['peptide_ID_Summary']=  peptide_ID_summary
 
-            pep_other_info.to_csv("pep_other_info.tsv", sep="\t")
-            pep_abundance.to_csv("pep_abundance.tsv", sep="\t")
-            pep_ID.to_csv("pep_ID.tsv", sep="\t")
-            peptide_ID_summary.to_csv("peptide_ID_summary.tsv", sep="\t")
-
         if self.ignore_proteins is False:
             protein_ID_summary = self.sumIDs(prot_ID)
             return_matrix['protein_other_info']= prot_other_info
@@ -916,10 +910,6 @@ class SCP_processor:
             return_matrix['protein_ID_matrix']=  prot_ID
             return_matrix['protein_ID_Summary']=  protein_ID_summary
 
-            prot_other_info.to_csv("prot_other_info.tsv", sep="\t")
-            prot_abundance.to_csv("prot_abundance.tsv", sep="\t")
-            prot_ID.to_csv("prot_ID.tsv", sep="\t")
-            protein_ID_summary.to_csv("protein_ID_summary.tsv", sep="\t")
         return return_matrix
 
     def read_files(self, queue_ids=None, queue_info=None, processor_info=None, 

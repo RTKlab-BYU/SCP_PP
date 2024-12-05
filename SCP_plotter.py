@@ -1327,7 +1327,7 @@ class SCP_plotter:
         return fig
 
     # CV Violin plots ###
-    def CV_plots(self, data_object, plot_options, saved_settings, username=None):
+    def CV_plots(self, data_object, plot_options, saved_settings, username=None, missing_value_thresh = 33):
         """_Prepare data for creating protein CV violin plots_
         """
         group_names = [key for key in saved_settings.keys() if "Order@" not in str(key)]
@@ -1364,8 +1364,10 @@ class SCP_plotter:
             i += 1
 
         if plot_options["plot_type"] == 1:
+            is_protein = True
             matrix_name = "protein_abundance"
         elif plot_options["plot_type"] == 2:
+            is_protein = False
             matrix_name = "peptide_abundance" 
 
         # create a dictionary to store the intensity data
@@ -1392,7 +1394,7 @@ class SCP_plotter:
         else:
             for eachGroup in group_names:
                 current_condition_data =  self.processor.filter_by_missing_values(
-                    group_dict[eachGroup])
+                    group_dict[eachGroup], is_protein=is_protein, missing_value_thresh=missing_value_thresh)
                 Intensity_dict[eachGroup] =  self.processor.NormalizeToMedian(
                     current_condition_data[matrix_name])
 
@@ -1847,7 +1849,7 @@ class SCP_plotter:
 
         return fig
     
-    def venns_plots(self, data_object, plot_options, saved_settings, username=None,miss_val_thresh=33):
+    def venns_plots(self, data_object, plot_options, saved_settings, username=None, miss_val_thresh=33):
         """_Prepare data for creating ID veens plots (up to three groups)_
         """
         group_names = []
@@ -1867,7 +1869,7 @@ class SCP_plotter:
 
             run_ids = saved_settings[eachGroup]["records"]
             runname_sublist = data_object["run_metadata"].loc[data_object["run_metadata"]["Run Identifier"].isin(run_ids)]["Run Names"].to_list()
-            
+
             if self.processor.data_type == "TMT":
                 print(data_object["protein_ID_matrix"])
                 channel_ids = data_object["run_metadata"].loc[data_object["run_metadata"]["Run Identifier"].isin(run_ids)]["Channel Identifier"].to_list()
@@ -1876,7 +1878,6 @@ class SCP_plotter:
                     channel_ids)  
                 print(group_dict[eachGroup]["protein_ID_matrix"])
             elif self.processor.data_type == "LF":
-
                 group_dict[eachGroup] =  self.processor.filter_by_id(
                     data_object,
                     run_ids) # prevent the list from being changed
@@ -1984,10 +1985,10 @@ class SCP_plotter:
                 type="circle",
                 xref="x",
                 yref="y",
-                x0=v.centers[i][0] - v.radii[i],
-                y0=v.centers[i][1] - v.radii[i],
-                x1=v.centers[i][0] + v.radii[i],
-                y1=v.centers[i][1] + v.radii[i],
+                x0=v.centers[i].x - v.radii[i],
+                y0=v.centers[i].y - v.radii[i],
+                x1=v.centers[i].x + v.radii[i],
+                y1=v.centers[i].y + v.radii[i],
                 fillcolor=L_color[i],
                 line_color=L_color[i],
                 opacity=plot_options["opacity"]
@@ -2009,10 +2010,10 @@ class SCP_plotter:
                 L_annotation.append(anno_set_label)
 
                 # get min and max values of current set shape
-                L_x_max.append(v.centers[i][0] + v.radii[i])
-                L_x_min.append(v.centers[i][0] - v.radii[i])
-                L_y_max.append(v.centers[i][1] + v.radii[i])
-                L_y_min.append(v.centers[i][1] - v.radii[i])
+                L_x_max.append(v.centers[i].x + v.radii[i])
+                L_x_min.append(v.centers[i].x - v.radii[i])
+                L_y_max.append(v.centers[i].y + v.radii[i])
+                L_y_min.append(v.centers[i].y - v.radii[i])
             except Exception as err:
                 print(f"No set labels found {err}")
 
@@ -2079,6 +2080,8 @@ class SCP_plotter:
         
 
         return fig
+    
+
     # ###HYE plots####
     def HYE_plots(self, data_object,  plot_options, saved_settings, username=None):
         """_Prepare data for creating intensity volcano plots (two groups)_
@@ -2552,16 +2555,16 @@ class SCP_plotter:
                             'Accession']])
         # find common proteins
         commonProts = group1Data[group1Data['Accession'].isin(group2Data['Accession'])].drop_duplicates().loc[:,"Accession"]
-        print(commonProts.shape)
-        print(group1Data.shape)
-        print(group2Data.shape)
+        # print(commonProts.shape)
+        # print(group1Data.shape)
+        # print(group2Data.shape)
 
 
         # only leave common proteins
         group2Data = group2Data[group2Data['Accession'].isin(commonProts)].drop_duplicates()
         group1Data = group1Data[group1Data['Accession'].isin(commonProts)].drop_duplicates()
-        print(group1Data.shape)
-        print(group2Data.shape)
+        # print(group1Data.shape)
+        # print(group2Data.shape)
 
         group2Median = group2Data[group2+'_Intensity'].median(
             )
@@ -2582,9 +2585,9 @@ class SCP_plotter:
             # median of all. Calculate pOriginal, p, significant
             # pOriginal is a numpy array or list of p-values
             # method is the method to be used for adjusting the p-values
-            print(group2Data.columns)
-            print(group1Data.columns)
-            print(commonProts)
+            # print(group2Data.columns)
+            # print(group1Data.columns)
+            # print(commonProts)
             volcanoData = (group2Data
                         .merge(group1Data, on='Accession', how='inner'))
 
@@ -2625,7 +2628,7 @@ class SCP_plotter:
             volcanoData = volcanoData.assign(notRegulated=lambda x: (abs(
             np.log10(volcanoData[group2+'_Intensity']/volcanoData[
                     group1+'_Intensity'])) <=np.log10(1.25)) & (~volcanoData['significant']))
-            print(volcanoData)
+            # print(volcanoData)
             fig = self.plot_volcano_colored(
                 volcanoData,
                 label=f"({group2}/{group1})",
@@ -2688,19 +2691,19 @@ class SCP_plotter:
                             y=-np.log10(allData["benjamini"]),
                             text=allData["Accession"],
                             mode="markers", marker=dict(
-                                color=plot_options["all color"],size=20))
+                                color=plot_options["all color"],size=plot_options["marker_size"]))
         if downData.shape[0] != 0:
             fig.add_scatter(x=np.log2(downData[right]/downData[left]),
                             y=-np.log10(downData["benjamini"]),
                             text=downData["Accession"],
                             mode="markers",
-                            marker=dict(color=plot_options["down color"],size=20))
+                            marker=dict(color=plot_options["down color"],size=plot_options["marker_size"]))
         if upData.shape[0] != 0:
             fig.add_scatter(x=np.log2(upData[right]/upData[left]),
                             y=-np.log10(upData["benjamini"]),
                             text=upData["Accession"],
                             mode="markers",
-                            marker=dict(color=plot_options["up color"],size=20))
+                            marker=dict(color=plot_options["up color"],size=plot_options["marker_size"]))
             fig.update_traces(
                 mode="markers",
                 hovertemplate="%{text}<br>x=: %{x}"
@@ -2810,7 +2813,7 @@ class SCP_plotter:
                 combined_pcaData = normalized_data
                 print("Empty")
             else:
-                combined_pcaData = pd.merge(combined_pcaData.drop_duplicates(), normalized_data.drop_duplicates())
+                combined_pcaData = pd.merge(combined_pcaData.drop_duplicates(), normalized_data.drop_duplicates(), on="Accession")
 
         #normalize the data
         # using ratio of current group median value divide by the all groups median 
@@ -3094,7 +3097,9 @@ class SCP_plotter:
         # filter runs into different groups
         i = 0
         runname_list = []  # this will contain list of run names list for each groups
-        #print(saved_settings)
+
+        # print(saved_settings)
+        
         for eachGroup in group_names:
             run_ids = saved_settings[eachGroup]["records"]
             runname_sublist = data_object["run_metadata"].loc[data_object["run_metadata"]["Run Identifier"].isin(run_ids)]["Run Names"].to_list()
@@ -3198,9 +3203,9 @@ class SCP_plotter:
             renamed_data.columns = new_names
             # display(combined_heatmap_data)
             renamed_data = renamed_data.drop_duplicates(subset=["Accession"]).reset_index()
-            print(renamed_data)
+            # print(renamed_data)
             long_data = pd.melt(renamed_data,id_vars="Accession",var_name="Sample",value_name="Intensity").reset_index()
-            print(long_data)
+            # print(long_data)
             
             # if plot_options["agg_groups"]:
             #     # long_data= long_data.groupby(["Accession", "Group"]).agg({"Intensity": "mean"}).reset_index()
@@ -3210,8 +3215,8 @@ class SCP_plotter:
             #     pivoted_data =  long_data.pivot(index=index,columns="Accession", values = "Intensity").reset_index()
             # else:
             #     index = "Sample"
-            pivoted_data =  long_data.pivot(index="Sample",columns="Accession", values = "Intensity").reset_index()
-            print(pivoted_data)
+            pivoted_data =  long_data.pivot_table(index="Sample",columns="Accession", values = "Intensity", aggfunc="mean").reset_index()
+            # print(pivoted_data)
             pivoted_data["Group"] = pivoted_data["Sample"].str.replace("_#.*","",regex=True)
             # new_cols = combined_heatmap_data.columns.drop("Accession")
             # display(pivoted_data)
