@@ -1,0 +1,5 @@
+Conditions	filter_in	filter_out	Organism	Amount	Setup
+Hela_lib	Hela_lib		Human	100	A
+K562_lib	K562_lib		Human	100	A
+Hela_SC	Hela_1cpw		Human	100	A
+K562_SC	K562_1cpw_		Human	100	A
