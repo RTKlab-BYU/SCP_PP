@@ -458,7 +458,7 @@ class SCP_processor:
                     peptide_table_MS2 = peptide_table_MS2.loc[peptide_table_MS2["Protein.Names"].str.endswith("_"+this_organism)]
 
                 # Creates a new data frame
-                pep_other_info = pd.DataFrame({"Mapped Proteins": peptide_table["Protein.Group"], "Annotated Sequence": peptide_table["Modified.Sequence"]})
+                pep_other_info = pd.DataFrame({"Mapped Proteins": peptide_table["Protein.Group"], "Annotated Sequence": peptide_table["Precursor.Id"]})
                 pep_other_info["Source_File"] = "None"
 
                 # Filters out proteins with "contam" or that are null
@@ -477,20 +477,20 @@ class SCP_processor:
                 # run_name_list = pd.DataFrame({"Run Names": run_name_list})
                 # run_name_list['Run Identifier'] = run_name_list.index.to_series().apply(lambda x: str(file_id) + "-" + str(x))
                
-                # Separate the columns of just "Modified.Sequence" and file names
-                peptide_path_cols = peptide_table_MS2.filter(regex='\\\\|Modified.Sequence|Precursor.Charge').columns
+                # Separate the columns of just "Precursor.Id" and file names
+                peptide_path_cols = peptide_table_MS2.filter(regex='\\\\|Precursor.Id|Precursor.Charge').columns
 
-                # Create data frames that are just the columns with "Modified.Sequence" or a filename
+                # Create data frames that are just the columns with "Precursor.Id" or a filename
                 pep_abundance = peptide_table.loc[:, peptide_path_cols]
                 pep_abundance_MS2 = peptide_table_MS2.loc[:, peptide_path_cols]
 
-                # Rename the column "Modified.Sequence" to "Annotated Sequence"
+                # Rename the column "Precursor.Id" to "Annotated Sequence"
                 if this_organism != None:
                     pep_abundance.columns = [os.path.splitext(os.path.basename(x))[0]+"_"+this_organism if x in file_path_cols else x for x in pep_abundance.columns]
-                pep_abundance = pep_abundance.rename(columns={'Modified.Sequence': 'Annotated Sequence'})
+                pep_abundance = pep_abundance.rename(columns={'Precursor.Id': 'Annotated Sequence'})
                 if this_organism != None:
                     pep_abundance_MS2.columns = [os.path.splitext(os.path.basename(x))[0]+"_"+this_organism if x in file_path_cols else x for x in pep_abundance_MS2.columns]
-                pep_abundance_MS2 = pep_abundance_MS2.rename(columns={'Modified.Sequence': 'Annotated Sequence'})
+                pep_abundance_MS2 = pep_abundance_MS2.rename(columns={'Precursor.Id': 'Annotated Sequence'})
 
                 # Create a list of just the file names
                 file_path_cols = peptide_table.filter(regex='\\\\').columns
