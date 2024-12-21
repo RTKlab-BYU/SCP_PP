@@ -1272,6 +1272,10 @@ class SCP_processor:
             abundance_name = "peptide_abundance"
 
         protein_columns = data_object[matrix_name].copy()
+
+        # Create a tsv to look at the protein columns with the original data_object[matrix_name]
+        protein_columns.to_csv("data_obj/ID_Matrix.tsv", sep='\t')
+
         protein_columns["missingValues"] = 0
         # print(data_object[matrix_name].shape)
         i = 0
@@ -1289,12 +1293,18 @@ class SCP_processor:
         protein_columns = protein_columns.assign(missingValuesRate=(
             protein_columns["missingValues"] / i) * 100)
         
+        # Create a tsv to look at the protein columns with the missing value rates
+        protein_columns.to_csv("data_obj/MVR_proteins.tsv", sep='\t')
+        
         protein_columns = protein_columns.query(
             "missingValuesRate < @missing_value_thresh")
         
         data_object[abundance_name] = data_object[abundance_name].loc[data_object[abundance_name][name].isin (protein_columns[name].tolist())]
         data_object[matrix_name] = data_object[matrix_name].loc[data_object[matrix_name][name].isin (protein_columns[name].tolist())]
         data_object[other_info_name] = data_object[other_info_name].loc[data_object[other_info_name][name].isin( protein_columns[name].tolist())]
+
+        # Create a tsv to look at the modified data_object[matrix_name]
+        protein_columns.to_csv("data_obj/Mod_ID_Matrix.tsv", sep='\t')
 
         # print(data_object[abundance_name])
         # protein_columns = protein_columns.loc[:,
@@ -1350,10 +1360,9 @@ class SCP_processor:
         # apply log2 to all the values if apply_log2 is True
         if apply_log2:    
             for each_column in columns:
+                place_holder = np.log2(np.nanmedian(abundance_data[each_column].replace(0, np.nan)))
                 abundance_data[each_column] = (
-                    np.log2(medianOfAll) * np.log2(abundance_data[each_column]) /
-                    np.log2(np.nanmedian(abundance_data[
-                        each_column].replace(0, np.nan))))
+                    np.log2(medianOfAll) * np.log2(abundance_data[each_column]) / place_holder)
         else:
             for each_column in columns:
                 abundance_data[each_column] = (

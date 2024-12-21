@@ -595,8 +595,11 @@ class SCP_plotter:
         for eachCategory in categories:
             toPlotIDs[eachCategory] = ""
             for eachGroup in group_names:
-                toPlotIDs.loc[toPlotIDs["Conditions"]==eachGroup,eachCategory] = saved_settings[eachGroup][eachCategory]
-        
+                toPlotIDs.loc[toPlotIDs["Conditions"]==eachGroup, eachCategory] = saved_settings[eachGroup][eachCategory]
+
+        # Create a csv file for the ToPlotIDs data
+        toPlotIDs.to_csv("data_obj/ID_plot_info.tsv", sep="\t")
+
         #display(toPlotIDs)
         fig = self.plot_IDChart_plotly(toPlotIDs,
                                 username=username,
@@ -1327,7 +1330,7 @@ class SCP_plotter:
         return fig
 
     # CV Violin plots ###
-    def CV_plots(self, data_object, plot_options, saved_settings, username=None, missing_value_thresh = 33):
+    def CV_plots(self, data_object, plot_options, saved_settings, username=None, missing_value_thresh=33):
         """_Prepare data for creating protein CV violin plots_
         """
         group_names = [key for key in saved_settings.keys() if "Order@" not in str(key)]
@@ -1350,13 +1353,13 @@ class SCP_plotter:
 
             run_ids = saved_settings[eachGroup]["records"]
             runname_sublist = data_object["run_metadata"].loc[data_object["run_metadata"]["Run Identifier"].isin(run_ids)]["Run Names"].to_list()
+            
             if self.processor.data_type == "TMT":
                 channel_ids = data_object["run_metadata"].loc[data_object["run_metadata"]["Run Identifier"].isin(run_ids)]["Channel Identifier"].to_list()
                 group_dict[eachGroup] =  self.processor.filter_by_channel_id(
                     data_object,
                     channel_ids)  
             elif self.processor.data_type == "LF":
-
                 group_dict[eachGroup] =  self.processor.filter_by_id(
                     data_object,
                     run_ids)  # prevent the list from being changed
@@ -1377,18 +1380,18 @@ class SCP_plotter:
             Intensity_dict_MS2 = {}
             for eachGroup in group_names:
                 current_condition_data =  self.processor.filter_by_missing_values(
-                    group_dict[eachGroup])
+                    group_dict[eachGroup], is_protein=is_protein, missing_value_thresh=missing_value_thresh)
                 Intensity_dict[eachGroup] =  self.processor.NormalizeToMedian(
                     current_condition_data[matrix_name])
                 current_condition_data_MS2 =  self.processor.filter_by_missing_values_MS2( #returns
-                    group_dict[eachGroup])
+                    group_dict[eachGroup], is_protein=is_protein, missing_value_thresh=missing_value_thresh)
                 Intensity_dict_MS2[eachGroup] =  self.processor.NormalizeToMedian(
                     current_condition_data_MS2[matrix_name])
         elif plot_options["CV mode"] == "MS2":
             Intensity_dict_MS2 = {}
             for eachGroup in group_names:
                 current_condition_data_MS2 =  self.processor.filter_by_missing_values_MS2(
-                    group_dict[eachGroup])
+                    group_dict[eachGroup], is_protein=is_protein, missing_value_thresh=missing_value_thresh)
                 Intensity_dict[eachGroup] =  self.processor.NormalizeToMedian(
                     current_condition_data_MS2[matrix_name])
         else:
@@ -1871,12 +1874,12 @@ class SCP_plotter:
             runname_sublist = data_object["run_metadata"].loc[data_object["run_metadata"]["Run Identifier"].isin(run_ids)]["Run Names"].to_list()
 
             if self.processor.data_type == "TMT":
-                print(data_object["protein_ID_matrix"])
+                # print(data_object["protein_ID_matrix"])
                 channel_ids = data_object["run_metadata"].loc[data_object["run_metadata"]["Run Identifier"].isin(run_ids)]["Channel Identifier"].to_list()
                 group_dict[eachGroup] =  self.processor.filter_by_channel_id(
                     data_object,
                     channel_ids)  
-                print(group_dict[eachGroup]["protein_ID_matrix"])
+                # print(group_dict[eachGroup]["protein_ID_matrix"])
             elif self.processor.data_type == "LF":
                 group_dict[eachGroup] =  self.processor.filter_by_id(
                     data_object,
@@ -1895,9 +1898,22 @@ class SCP_plotter:
             is_protein = False
         
         for eachGroup in group_names:
+
+            if plot_options["method"] == "MS2":
+                current_condition_data = self.processor.filter_by_missing_values_MS2(
+                    group_dict[eachGroup], is_protein=is_protein, missing_value_thresh=miss_val_thresh)
+            elif plot_options["method"] == "Total":
+                current_condition_data = self.processor.filter_by_missing_values(
+                    group_dict[eachGroup], is_protein=is_protein, missing_value_thresh=miss_val_thresh)
+            else:
+                print("method needs to be 'MS2' or 'Total'.")
+                raise TypeError("method needs to be 'MS2' or 'Total'.")
             
-            current_condition_data = self.processor.filter_by_missing_values_MS2(
-                group_dict[eachGroup], is_protein=is_protein, missing_value_thresh=miss_val_thresh)
+            if "Hela" in eachGroup:
+                current_condition_data["peptide_ID_matrix"].to_csv("data_obj/Hela_ID_Matrix_mod.tsv", sep='\t')
+            else:
+                current_condition_data["peptide_ID_matrix"].to_csv("data_obj/K562_ID_Matrix_mod.tsv", sep='\t')
+
 
             data_set.append(
                 set(current_condition_data[matrix_name][molecule_name].unique()))
@@ -2083,7 +2099,7 @@ class SCP_plotter:
     
 
     # ###HYE plots####
-    def HYE_plots(self, data_object,  plot_options, saved_settings, username=None):
+    def HYE_plots(self, data_object,  plot_options, saved_settings, username=None, is_protein=False, missing_value_thresh=33):
         """_Prepare data for creating intensity volcano plots (two groups)_
         """
         group_names = []
@@ -2118,7 +2134,7 @@ class SCP_plotter:
 
         for eachGroup in group_names:
             current_condition_data = self.processor.filter_by_missing_values(
-                group_dict[eachGroup])
+                group_dict[eachGroup], is_protein=is_protein, missing_value_thresh=missing_value_thresh)
             Intensity_dict[eachGroup] = self.processor.NormalizeToMedian(
                 current_condition_data["protein_abundance"],apply_log2=True)
             
@@ -2747,7 +2763,7 @@ class SCP_plotter:
 
 
     # ###PCA plots####
-    def PCA_plots(self, data_object, plot_options, saved_settings,username=None):
+    def PCA_plots(self, data_object, plot_options, saved_settings,username=None, is_protein=False, missing_value_thresh=33):
         """_Prepare data for creating intensity PCA plots (two groups)_
         """
         group_names = []
@@ -3084,7 +3100,7 @@ class SCP_plotter:
 
         return fig, CSV_link, png_link
     
-    def heatmap_plots(self, data_object, plot_options, saved_settings, username=None):
+    def heatmap_plots(self, data_object, plot_options, saved_settings, username=None, missing_value_thresh=33):
         group_names = []
 
         # no compare groups is provided, compare first two
@@ -3128,7 +3144,7 @@ class SCP_plotter:
         for eachGroup in group_names:
 
             current_condition_data = self.processor.filter_by_missing_values(
-                group_dict[eachGroup])
+                group_dict[eachGroup], missing_value_thresh=missing_value_thresh)
             # print(current_condition_data)
             normalized_data = self.processor.NormalizeToMedian(
                 current_condition_data["protein_abundance"],apply_log2=False) #apply this later
