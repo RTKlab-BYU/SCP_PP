@@ -1383,10 +1383,18 @@ class SCP_plotter:
                     group_dict[eachGroup], is_protein=is_protein, missing_value_thresh=missing_value_thresh)
                 Intensity_dict[eachGroup] =  self.processor.NormalizeToMedian(
                     current_condition_data[matrix_name])
+                
+                # Output the Intensity file to a folder data_obj
+                Intensity_dict[eachGroup].to_csv(f"data_obj/intensity_files/{eachGroup}_filtered_normed.tsv", sep='\t')
+                
                 current_condition_data_MS2 =  self.processor.filter_by_missing_values_MS2( #returns
                     group_dict[eachGroup], is_protein=is_protein, missing_value_thresh=missing_value_thresh)
                 Intensity_dict_MS2[eachGroup] =  self.processor.NormalizeToMedian(
                     current_condition_data_MS2[matrix_name])
+                
+                # Output the Intensity file to a folder data_obj
+                Intensity_dict_MS2[eachGroup].to_csv(f"data_obj/intensity_files/MS2_{eachGroup}_filtered_normed.tsv", sep='\t')
+
         elif plot_options["CV mode"] == "MS2":
             Intensity_dict_MS2 = {}
             for eachGroup in group_names:
@@ -1394,13 +1402,19 @@ class SCP_plotter:
                     group_dict[eachGroup], is_protein=is_protein, missing_value_thresh=missing_value_thresh)
                 Intensity_dict[eachGroup] =  self.processor.NormalizeToMedian(
                     current_condition_data_MS2[matrix_name])
+                
+                # Output the Intensity file to a folder data_obj
+                Intensity_dict_MS2[eachGroup].to_csv(f"data_obj/intensity_files/MS2_{eachGroup}_filtered_normed.tsv", sep='\t')
         else:
             for eachGroup in group_names:
                 current_condition_data =  self.processor.filter_by_missing_values(
                     group_dict[eachGroup], is_protein=is_protein, missing_value_thresh=missing_value_thresh)
                 Intensity_dict[eachGroup] =  self.processor.NormalizeToMedian(
                     current_condition_data[matrix_name])
-
+                
+                # Output the Intensity file to a folder data_obj
+                Intensity_dict[eachGroup].to_csv(f"data_obj/intensity_files/{eachGroup}_filtered_normed.tsv", sep='\t')
+                
         all_cvs = pd.DataFrame()
 
         for eachGroup in Intensity_dict:
@@ -1885,6 +1899,7 @@ class SCP_plotter:
                     data_object,
                     run_ids) # prevent the list from being changed
             runname_list.append(runname_sublist)
+
             i += 1
         data_set = []
         labels_set = []

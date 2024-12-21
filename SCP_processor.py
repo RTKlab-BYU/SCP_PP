@@ -556,8 +556,8 @@ class SCP_processor:
                 if this_organism != None:
                     protein_table_MS2 = protein_table_MS2.loc[protein_table_MS2["Protein.Names"].str.endswith("_"+this_organism)]
                     
-                # Create a new data frame with just the Genes and Protein.Group columns
-                prot_other_info = pd.DataFrame({"Accession": protein_table["Genes"], "Protein.Group": protein_table["Protein.Group"]})
+                # Create a new data frame with just the Protein.Group column as Accession and Protein.Group
+                prot_other_info = pd.DataFrame({"Accession": protein_table["Protein.Group"], "Protein.Group": protein_table["Protein.Group"]})
                 prot_other_info["Source_File"] = "None"
 
                 # meta_table = pd.read_csv(input5, sep=' ', header=None, names=["File Name"])
@@ -571,9 +571,9 @@ class SCP_processor:
                 # prot_other_info.rename(columns={'Protein': 'Accession'}, inplace=True)
 
                 # Get the file names from the meta table
-                protein_path_cols = protein_table_MS2.filter(regex='\\\\|Genes|Protein.Names').columns
+                protein_path_cols = protein_table_MS2.filter(regex='\\\\|Protein.Group|Protein.Names').columns
 
-                # Create data frames that are just the columns with "Genes" or a filename
+                # Create data frames that are just the columns with "Protein.Group", "Protein.Names" or a filename
                 prot_abundance = protein_table.loc[:, protein_path_cols]
                 prot_abundance_MS2 = protein_table_MS2.loc[:, protein_path_cols]
 
@@ -584,10 +584,10 @@ class SCP_processor:
                 prot_abundance.columns = [os.path.splitext(os.path.basename(x))[0] if x in file_path_cols else x for x in prot_abundance.columns]
                 prot_abundance_MS2.columns = [os.path.splitext(os.path.basename(x))[0] if x in file_path_cols else x for x in prot_abundance_MS2.columns]
 
-                # Rename Genes to Accession, and removes ";----" from the column
-                prot_abundance = prot_abundance.rename(columns={'Genes': 'Accession'})
+                # Rename Protein.Group to Accession, and removes ";----" from the column
+                prot_abundance = prot_abundance.rename(columns={'Protein.Group': 'Accession'})
                 prot_abundance["Accession"] =  prot_abundance["Accession"].str.replace(";.*","",regex = True)
-                prot_abundance_MS2 = prot_abundance_MS2.rename(columns={'Genes': 'Accession'})   
+                prot_abundance_MS2 = prot_abundance_MS2.rename(columns={'Protein.Group': 'Accession'})   
                 prot_abundance_MS2["Accession"] =  prot_abundance_MS2["Accession"].str.replace(";.*","",regex = True)
 
                 # Create a new data frame with just the file names and the run identifier "0-n"
