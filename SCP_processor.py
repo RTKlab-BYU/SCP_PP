@@ -75,6 +75,7 @@ class SCP_processor:
                             'MBR_IDs': MBR_ID,
                             'Total_IDs': total_ID})
 
+
     def generate_column_from_name_mapping(self,columns, partial_column_name_mapping):
         #input is column names, and a dictionary with what you want each column (key) to be renamed to (value)
         column_name_mapping = {}
@@ -84,6 +85,7 @@ class SCP_processor:
                     column_name_mapping[col] = value
                     break
         return column_name_mapping
+
 
     def generate_column_to_name_mapping(self, columns, partial_column_name_mapping):
         """Generates a dictionary that maps column names to a new name
@@ -154,7 +156,6 @@ class SCP_processor:
                 all_matrix.loc[(all_matrix[name].isin(MS2_matrix[name]) & (MS2_matrix[eachColumn] == "MS2")), [eachColumn]] = "MS2"
 
         return all_matrix
-
 
 
     def read_file(self,queue_id=None, queue_info=None, processor_info=None,
@@ -447,13 +448,19 @@ class SCP_processor:
         elif "DIANN_LF" in process_app:
             ## Peptides
             if self.ignore_peptides is False:
+                print("start peptide")
 
                 # read in DIANN output files
                 peptide_table = pd.read_table(input2,low_memory=False)
+
+                # Filters so only the protein names that end in this_organism stay
                 if this_organism != None:
                     peptide_table = peptide_table.loc[peptide_table["Protein.Names"].str.endswith("_"+this_organism)]
+                
                 # We currently do not have a MS2 file
                 peptide_table_MS2 = pd.read_table(input4,low_memory=False)
+
+                # Filters so only the protein names that end in this_organism stay
                 if this_organism != None:
                     peptide_table_MS2 = peptide_table_MS2.loc[peptide_table_MS2["Protein.Names"].str.endswith("_"+this_organism)]
 
@@ -485,21 +492,25 @@ class SCP_processor:
                 pep_abundance_MS2 = peptide_table_MS2.loc[:, peptide_path_cols]
 
                 # Rename the column "Precursor.Id" to "Annotated Sequence"
-                if this_organism != None:
-                    pep_abundance.columns = [os.path.splitext(os.path.basename(x))[0]+"_"+this_organism if x in file_path_cols else x for x in pep_abundance.columns]
                 pep_abundance = pep_abundance.rename(columns={'Precursor.Id': 'Annotated Sequence'})
-                if this_organism != None:
-                    pep_abundance_MS2.columns = [os.path.splitext(os.path.basename(x))[0]+"_"+this_organism if x in file_path_cols else x for x in pep_abundance_MS2.columns]
                 pep_abundance_MS2 = pep_abundance_MS2.rename(columns={'Precursor.Id': 'Annotated Sequence'})
 
                 # Create a list of just the file names
                 file_path_cols = peptide_table.filter(regex='\\\\').columns
+
+                # Puts the organism name at the end of the file name, but not effectively because of the renaming below
+                # if this_organism != None:
+                #     pep_abundance.columns = [os.path.splitext(os.path.basename(x))[0]+"_"+this_organism if x in file_path_cols else x for x in pep_abundance.columns]                
+                # if this_organism != None:
+                #     pep_abundance_MS2.columns = [os.path.splitext(os.path.basename(x))[0]+"_"+this_organism if x in file_path_cols else x for x in pep_abundance_MS2.columns]
 
                 # Creates a data frame of just the file names (no .raw)
                 run_name_list = pd.DataFrame(data={"Run Names": [os.path.splitext(x)[0] for x in file_path_cols]})
 
                 # Creates a new column in the data frame that is used to identify the run by the index of the data frame
                 run_name_list['Run Identifier'] = run_name_list.index.to_series().apply(lambda x: str(file_id) + "-" + str(x))
+
+                run_name_list.to_csv("data_obj/run_name_list_pep.tsv", sep='\t')
 
                 # Rename the file columns of pep_abundance to be just the run names (no .raw) 
                 for item in [pep_abundance,pep_abundance_MS2]:
@@ -541,10 +552,13 @@ class SCP_processor:
                 pep_ID = self.combine_diann_IDs(pep_ID, pep_ID_MS2)
                 pep_ID.drop(["Precursor.Charge"], axis=1, inplace=True)
 
+                print("finish peptide")
+
 
                 
             ## Proteins
             if self.ignore_proteins is False:
+                print("start protein")
 
                 # Read in DIANN output files (normal)
                 protein_table = pd.read_table(input1,low_memory=False)
@@ -594,6 +608,8 @@ class SCP_processor:
                 run_name_list = pd.DataFrame(data={"Run Names": [os.path.splitext(os.path.basename(x))[0] for x in file_path_cols]})
                 run_name_list['Run Identifier'] = run_name_list.index.to_series().apply(lambda x: str(file_id) + "-" + str(x))
 
+                run_name_list.to_csv("data_obj/run_name_list_prot.tsv", sep='\t')
+
                 for item in [prot_abundance, prot_abundance_MS2]:
                     # Generate a new column name mapping using the function
                     filename_to_identifier_map = dict(zip(run_name_list["Run Names"], run_name_list["Run Identifier"]))
@@ -634,6 +650,8 @@ class SCP_processor:
                 # There is an "MBR" when a run has data for a peptide in just the normal data
                 prot_ID = self.combine_diann_IDs(prot_ID, prot_ID_MS2)   
                 prot_ID.drop(["Protein.Names"], axis=1, inplace=True)
+
+                print("finish protein")
 
             
         elif "FragPipe_TMT" in process_app:     # fragpipe results
@@ -895,6 +913,7 @@ class SCP_processor:
         # Creates a column in run_name_list for the processing app 
         run_name_list["Processing App"] = process_app
 
+        run_name_list.to_csv("data_obj/run_name_list.tsv", sep='\t')
         return_matrix = {'run_metadata': run_name_list}  
         if self.ignore_peptides is False:
             peptide_ID_summary = self.sumIDs(pep_ID)  
@@ -911,6 +930,7 @@ class SCP_processor:
             return_matrix['protein_ID_Summary']=  protein_ID_summary
 
         return return_matrix
+
 
     def read_files(self, queue_ids=None, queue_info=None, processor_info=None, 
                    grouped_input_files=[], organisms=[None]):
@@ -964,7 +984,7 @@ class SCP_processor:
         return data_objects
 
 
-    def outer_join_data_objects(self,data_objects):
+    def outer_join_data_objects(self, data_objects):
         '''
         Takes in a list of data objects as given by read_files and converts them to a single data object as given by read_files,
         protein info continues to show what was found on each original file, and so forth.
@@ -973,10 +993,14 @@ class SCP_processor:
         first_file = True
         for eachDataObject in data_objects:
             print("***")
+
+            # This logic is sound. If eachDataObject is the first file, initiate final_data_object to it
             if first_file:
                 first_file = False
                 final_data_object = eachDataObject
+
             else:
+                
                 final_data_object['run_metadata'] = pd.concat([final_data_object['run_metadata'], eachDataObject['run_metadata']]).reset_index(drop=True)
                 if self.ignore_proteins is False:
                     final_data_object['protein_other_info'] = eachDataObject["protein_abundance"][["Accession"]]
@@ -984,7 +1008,7 @@ class SCP_processor:
                 if self.ignore_peptides is False:
                     final_data_object['peptide_other_info'] = eachDataObject["peptide_abundance"][["Annotated Sequence"]]
                     final_data_object['peptide_ID_Summary'] = pd.concat([final_data_object['peptide_ID_Summary'], eachDataObject['peptide_ID_Summary']]).reset_index(drop=True)
-                duplicates_found = False
+                # duplicates_found = False
                 
                 #loop through to see if there are any duplicate files
                 if self.ignore_proteins is False:
@@ -1004,6 +1028,7 @@ class SCP_processor:
                     final_data_object['peptide_ID_matrix'] = pd.merge(final_data_object['peptide_ID_matrix'],eachDataObject['peptide_ID_matrix'],how="outer")
                     
         return final_data_object
+
 
     def sort_runs(self, data_object, settings_file):
         
@@ -1085,6 +1110,7 @@ class SCP_processor:
         
         return saved_settings
 
+
     def calculate_missing_values_MS2(self,data_object,
                                 missing_value_thresh=33,
                                 is_protein=True,
@@ -1143,6 +1169,7 @@ class SCP_processor:
         
         
         return returnMatrix
+
 
     def filter_by_missing_values(self,data_object,
                                 missing_value_thresh=33,
@@ -1236,6 +1263,7 @@ class SCP_processor:
             # This will cause the veen diagram to be different from R program
         
         return data_object
+
 
     def filter_by_missing_values_MS2(self,data_object,
                                 missing_value_thresh=33,
@@ -1374,6 +1402,7 @@ class SCP_processor:
 
         return abundance_data
 
+
     def calculate_cvs(self,abundance_data):
         """_Calculate mean, stdev, cv for withn each protein/peptide abundance_
 
@@ -1430,12 +1459,14 @@ class SCP_processor:
             p_values.append(benjamini)
 
         return p_values
-    
+
+
     def percentile(SELF,percentile):
         def percentile_(x):
             return x.quantile(percentile)
         percentile_.__name__ = 'percentile_{:02.0f}'.format(percentile*100)
         return percentile_
+
 
     def impute_knn(self,abundance_data, k=5):
         """_inpute missing value from neighbor values_
@@ -1476,6 +1507,7 @@ class SCP_processor:
             x_imputed.insert(loc=0, column=name, value=names)
         
         return x_imputed
+
 
     def CalculatePCA(self,abundance_object, infotib,log2T = False):
         """_inpute PCA transformed and variance explained by each principal
@@ -1523,76 +1555,6 @@ class SCP_processor:
         return pca_panda, exp_var_pca
 
 
-    
-# def filter_by_name(self,data_dict, runname_list):
-#         """_Filter the data_dict based on runname_list, only keep the columns
-#         of the data_dict that are in the runname_list_
-#         Args:
-
-#         Returns:
-#             _type_: _description_
-#         """
-
-#         # make dict for each runname, no Accession/sequence
-#         nameDict_channels = dict(zip(data_dict["run_metadata"]["Run Names"],data_dict["run_metadata"]["Channel Identifier"]))
-
-#         nameDict_runs = dict(zip(data_dict["run_metadata"]["Run Names"],data_dict["run_metadata"]["Run Identifier"]))
-        
-#         identifier_list = []
-        
-#         identifier_list_plus = []
-
-#         run_id_list = []
-
-#         if "Annotated Sequence" in runname_list:
-#             runname_list.remove("Annotated Sequence")
-#         if "Accession" in runname_list:
-#             runname_list.remove("Accession")
-#         for eachName in runname_list:
-#             run_id_list.append(nameDict_runs[eachName])
-#         for eachName in runname_list:
-#             identifier_list.append(nameDict_channels[eachName])
-#         for eachName in runname_list:
-#             identifier_list_plus.append(nameDict_channels[eachName])
-
-
-#         filtered_data = {}
-#     # filtered_data["meta"] = data_dict["meta"]
-#         runname_list.extend(["Annotated Sequence","Accession"])
-#         identifier_list_plus.extend(["Annotated Sequence","Accession"])
-
-#         #filtered_data["run_metadata"] = [item for item in data_dict[
-#         #   "run_metadata"] if item in runname_list]
-        
-#         filtered_data["run_metadata"] = data_dict["run_metadata"][
-#             data_dict["run_metadata"]["Run Names"].isin(
-#                 runname_list)]  
-#         filtered_data["protein_abundance"] = data_dict["protein_abundance"][[
-#             col for col in data_dict["protein_abundance"].columns if any(
-#                 word == col for word in identifier_list_plus)]]
-#         filtered_data["peptide_abundance"] = data_dict["peptide_abundance"][[
-#             col for col in data_dict["peptide_abundance"].columns if any(
-#                 word == col for word in identifier_list_plus)]]
-#         filtered_data["protein_other_info"] = data_dict["protein_other_info"][[
-#             col for col in data_dict["protein_other_info"].columns if any(
-#                 word == col for word in identifier_list_plus)]]
-#         filtered_data["peptide_other_info"] = data_dict["peptide_other_info"][[
-#             col for col in data_dict["peptide_other_info"].columns if any(
-#                 word == col for word in identifier_list_plus)]]
-#         filtered_data["protein_ID_matrix"] = data_dict["protein_ID_matrix"][[
-#             col for col in data_dict["protein_ID_matrix"].columns if any(
-#                 word == col for word in identifier_list_plus)]]
-#         filtered_data["peptide_ID_matrix"] = data_dict["peptide_ID_matrix"][[
-#             col for col in data_dict["peptide_ID_matrix"].columns if any(
-#                 word == col for word in identifier_list_plus)]]
-#         filtered_data["protein_ID_Summary"] = data_dict["protein_ID_Summary"][
-#             data_dict["protein_ID_Summary"]["names"].isin(
-#                 run_id_list)]
-#         filtered_data["peptide_ID_Summary"] = data_dict["peptide_ID_Summary"][
-#             data_dict["peptide_ID_Summary"]["names"].isin(
-#                 run_id_list)]
-#         return filtered_data
-
     def filter_by_id(self,data_dict, run_id_list):
         """_Filter the data_dict based on runname_list, only keep the columns
         of the data_dict that are in the runname_list_
@@ -1604,6 +1566,7 @@ class SCP_processor:
 
         # make dict for each runname, no Accession/sequence
         
+        # THIS IS LIKELY WRONG, It should probably be Run Identifier to the Run Names
         nameDict_channels = dict(zip(data_dict["run_metadata"]["Run Identifier"],data_dict["run_metadata"]["Run Identifier"]))
 
         identifier_list = []
@@ -1617,9 +1580,8 @@ class SCP_processor:
             run_id_list.remove("Accession")
         for eachName in run_id_list:
             identifier_list.append(nameDict_channels[eachName])
-        for eachName in run_id_list:
+        for eachName in run_id_list:         # Redundant. Put them in the same for loop or make a copy, don't even need a copy
             identifier_list_plus.append(nameDict_channels[eachName])
-
 
         filtered_data = {}
         # filtered_data["meta"] = data_dict["meta"]
@@ -1660,7 +1622,8 @@ class SCP_processor:
                     run_id_list)]
       
         return filtered_data
-        
+
+
     def filter_by_channel_id(self,data_dict, run_id_list):
         """_Filter the data_dict based on runname_list, only keep the columns
         of the data_dict that are in the runname_list_
@@ -1730,3 +1693,72 @@ class SCP_processor:
                     run_id_list)]
         return filtered_data
         
+
+# def filter_by_name(self,data_dict, runname_list):
+#         """_Filter the data_dict based on runname_list, only keep the columns
+#         of the data_dict that are in the runname_list_
+#         Args:
+
+#         Returns:
+#             _type_: _description_
+#         """
+
+#         # make dict for each runname, no Accession/sequence
+#         nameDict_channels = dict(zip(data_dict["run_metadata"]["Run Names"],data_dict["run_metadata"]["Channel Identifier"]))
+
+#         nameDict_runs = dict(zip(data_dict["run_metadata"]["Run Names"],data_dict["run_metadata"]["Run Identifier"]))
+        
+#         identifier_list = []
+        
+#         identifier_list_plus = []
+
+#         run_id_list = []
+
+#         if "Annotated Sequence" in runname_list:
+#             runname_list.remove("Annotated Sequence")
+#         if "Accession" in runname_list:
+#             runname_list.remove("Accession")
+#         for eachName in runname_list:
+#             run_id_list.append(nameDict_runs[eachName])
+#         for eachName in runname_list:
+#             identifier_list.append(nameDict_channels[eachName])
+#         for eachName in runname_list:
+#             identifier_list_plus.append(nameDict_channels[eachName])
+
+
+#         filtered_data = {}
+#     # filtered_data["meta"] = data_dict["meta"]
+#         runname_list.extend(["Annotated Sequence","Accession"])
+#         identifier_list_plus.extend(["Annotated Sequence","Accession"])
+
+#         #filtered_data["run_metadata"] = [item for item in data_dict[
+#         #   "run_metadata"] if item in runname_list]
+        
+#         filtered_data["run_metadata"] = data_dict["run_metadata"][
+#             data_dict["run_metadata"]["Run Names"].isin(
+#                 runname_list)]  
+#         filtered_data["protein_abundance"] = data_dict["protein_abundance"][[
+#             col for col in data_dict["protein_abundance"].columns if any(
+#                 word == col for word in identifier_list_plus)]]
+#         filtered_data["peptide_abundance"] = data_dict["peptide_abundance"][[
+#             col for col in data_dict["peptide_abundance"].columns if any(
+#                 word == col for word in identifier_list_plus)]]
+#         filtered_data["protein_other_info"] = data_dict["protein_other_info"][[
+#             col for col in data_dict["protein_other_info"].columns if any(
+#                 word == col for word in identifier_list_plus)]]
+#         filtered_data["peptide_other_info"] = data_dict["peptide_other_info"][[
+#             col for col in data_dict["peptide_other_info"].columns if any(
+#                 word == col for word in identifier_list_plus)]]
+#         filtered_data["protein_ID_matrix"] = data_dict["protein_ID_matrix"][[
+#             col for col in data_dict["protein_ID_matrix"].columns if any(
+#                 word == col for word in identifier_list_plus)]]
+#         filtered_data["peptide_ID_matrix"] = data_dict["peptide_ID_matrix"][[
+#             col for col in data_dict["peptide_ID_matrix"].columns if any(
+#                 word == col for word in identifier_list_plus)]]
+#         filtered_data["protein_ID_Summary"] = data_dict["protein_ID_Summary"][
+#             data_dict["protein_ID_Summary"]["names"].isin(
+#                 run_id_list)]
+#         filtered_data["peptide_ID_Summary"] = data_dict["peptide_ID_Summary"][
+#             data_dict["peptide_ID_Summary"]["names"].isin(
+#                 run_id_list)]
+#         return filtered_data        

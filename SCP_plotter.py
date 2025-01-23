@@ -34,6 +34,7 @@ class SCP_plotter:
         self.url_base = None
         self.data_type = data_type
 
+
     def Fraction_ID_plots(self, data_object, plot_options, saved_settings, username=None):
         """_Prepare data for creating protein peptide identification bar
         plot_
@@ -168,6 +169,7 @@ class SCP_plotter:
             CSV_link = None
             SVG_link = None
         return fig, CSV_link, SVG_link
+
 
     def plot_fract_IDChart_plotly(self, ID_data,
                             username=None,
@@ -440,6 +442,7 @@ class SCP_plotter:
             fig.update_xaxes(categoryorder='array', categoryarray = plot_options["x_axis_order"])
         return fig
 
+
     def ID_plots(self, data_object, plot_options, saved_settings, username=None):
         """_Prepare data for creating protein peptide identification bar
         plot_
@@ -447,19 +450,21 @@ class SCP_plotter:
         Args:
             data_dict (_type_): _description_
         """
-        # Create an empty dictionary to store the group names and filters
         group_names = [key for key in saved_settings.keys() if "Order@" not in str(key)]
 
-        # import the data and save order
+        # Create an empty dictionary to store the group names and filters
         group_dict = {}
 
+        # save x-axis order
         if plot_options["ID mode"] == "MS2" or plot_options["ID mode"] == "total" or plot_options["ID mode"] == "stacked":
             x_axis_order = saved_settings["Order@Conditions"]
         elif plot_options["Group By X"] == "ID_Mode":
             print("ERROR: x axis separation of MS2/MBR not supported")
         else:
             x_axis_order = saved_settings["Order@"+plot_options["Group By X"]]
-        if plot_options["ID mode"] == "grouped" or plot_options["ID mode"] == "grouped_stacked" and plot_options["Group By Color"] != "ID_Mode":
+
+        # Save the color_order 
+        if (plot_options["ID mode"] == "grouped" or plot_options["ID mode"] == "grouped_stacked") and plot_options["Group By Color"] != "ID_Mode":
             color_order = saved_settings["Order@"+plot_options["Group By Color"]]
             plot_options["color_order"] = color_order
 
@@ -541,18 +546,10 @@ class SCP_plotter:
                             allIDs = pd.concat(
                                 [allIDs,
                                 pd.DataFrame(
-                                    [[group_dict[eachCondition][
-                                        "peptide_ID_Summary"].at[index, "names"],
-                                    "peptide",
-                                    item,
-                                    eachCondition,
-                                    group_dict[eachCondition][
-                                        "peptide_ID_Summary"].at[index, item]]],
-                                    columns=["Names",
-                                            "ID_Type",
-                                            "ID_Mode",
-                                            "Conditions",
-                                            "IDs"])],
+                                    [[group_dict[eachCondition]["peptide_ID_Summary"].at[index, "names"],
+                                    "peptide", item, eachCondition,
+                                    group_dict[eachCondition]["peptide_ID_Summary"].at[index, item]]],
+                                    columns=["Names","ID_Type","ID_Mode","Conditions","IDs"])],
                                 ignore_index=True)
             allIDs = allIDs[allIDs["ID_Type"] == "peptide"]
                         
@@ -563,18 +560,16 @@ class SCP_plotter:
             allIDs = allIDs[allIDs["ID_Mode"] == "MS2_IDs"]
         elif plot_options["ID mode"] == "total":
             # total ID combined, if not already summed (key exist), sum them
-    #         if allIDs[allIDs["ID_Mode"] == "Total_IDs"].empty:
-    #             grouped = allIDs.groupby('name').agg(
-    #                 {'IDs': 'sum', 'ID_Type': 'first', 'Conditions': 'first'})
-    #             grouped = grouped.reset_index()
-    #             grouped["ID_Mode"] = "Total_IDs"
-    #             allIDs = grouped
+            # if allIDs[allIDs["ID_Mode"] == "Total_IDs"].empty:
+            #     grouped = allIDs.groupby('name').agg(
+            #         {'IDs': 'sum', 'ID_Type': 'first', 'Conditions': 'first'})
+            #     grouped = grouped.reset_index()
+            #     grouped["ID_Mode"] = "Total_IDs"
+            #     allIDs = grouped
             allIDs = allIDs[allIDs["ID_Mode"] == "Total_IDs"]
         elif plot_options["Group By X"] == "ID_Mode" or plot_options["Group By Color"] == "ID_Mode" \
             or plot_options["Group By Stack"] == "ID_Mode" and not (plot_options["ID mode"] == "total" or plot_options["ID mode"] == "MS2"):  # total separated
             pass
-        elif plot_options["ID mode"] == "MS2":
-            allIDs = allIDs[allIDs["ID_Mode"] == "MS2_IDs"]
         else:
             allIDs = allIDs[allIDs["ID_Mode"] == "Total_IDs"]
 
@@ -585,13 +580,15 @@ class SCP_plotter:
         toPlotIDs.columns = ['IDs', 'stdev', 'n', 'ID_Type']
         # reset the index after grouping
         toPlotIDs = toPlotIDs.reset_index()
+
         # calculate the confidence interval based on 95%confidence interval`
-        toPlotIDs["confInt"] = t.ppf(0.975, toPlotIDs['n']-1) * \
-            toPlotIDs['stdev']/np.sqrt(toPlotIDs['n'])
+        t_critical_value = t.ppf(0.975, toPlotIDs['n']-1)
+        sample_standard_error = toPlotIDs['stdev']/np.sqrt(toPlotIDs['n'])
+        toPlotIDs["confInt"] = t_critical_value * sample_standard_error
 
         #add columns for the categories specified in settings file (the one with all the filenames)
         standard_groups = ["filter_in","filter_out","records"]
-        categories = [col for col in list(saved_settings[list(group_names)[0]].keys()) if col not in standard_groups]
+        categories = [col for col in list(saved_settings[(group_names)[0]].keys()) if col not in standard_groups]
         for eachCategory in categories:
             toPlotIDs[eachCategory] = ""
             for eachGroup in group_names:
@@ -611,7 +608,9 @@ class SCP_plotter:
             # create the directory if it does not exist
             if not os.path.exists(data_dir):
                 Path(data_dir).mkdir(parents=True)
-            categories = [col for col in list(saved_settings[list(group_names)[0]].keys()) if col not in standard_groups]
+            
+            # This categories is already calculated above (line 591)
+            categories = [col for col in list(saved_settings[(group_names)[0]].keys()) if col not in standard_groups]
             
             for eachCategory in categories:
                 export_ids[eachCategory] = ""
@@ -626,7 +625,7 @@ class SCP_plotter:
             print("Downloading links...")
 
             # create the link for downloading the data
-            CSV_link = f"/files/{self.url_base}/csv/" \
+            CSV_link = f"/Users/{self.url_base}/csv/" \
                 f"{username}_ID_data.csv"
 
             # add SVG download link
@@ -645,7 +644,10 @@ class SCP_plotter:
         else:
             CSV_link = None
             SVG_link = None
+
+            
         return fig, CSV_link, SVG_link
+
 
     def plot_IDChart_plotly(self, ID_data,
                             username=None,
@@ -654,7 +656,7 @@ class SCP_plotter:
 
         Args:
             ID_data (_type_): _description_
-            username (str, optional): _description_. Defaults to "test".
+            username (str, optional): _description_. Defaults to "None".
             plot_options (_type_, optional): _description_. Defaults to None.
 
         Returns:
@@ -677,41 +679,51 @@ class SCP_plotter:
                 error_bars = "stdev"
                 error_visibile = False
 
+
             # mean label
-            if plot_options["mean label"] == "True" or \
-                    plot_options["mean label"] == True:
+            if plot_options["mean label"] == "True" or plot_options["mean label"] == True:
                 total_labels = [{"x": x, "y": total*1.15, "text": str(
                     int(total)), "showarrow": False} for x, total in zip(
                         ID_data["Conditions"], ID_data["IDs"])]
             else:
                 total_labels = []   # no mean labels
 
+            # ID_data
+            # Differs
             if plot_options["Group By X"] == "ID_Mode" or plot_options["Group By Color"] == "ID_Mode":  # total separated
                 ID_data = ID_data[ID_data["ID_Mode"] != "Total_IDs"]
             else:
                 ID_data = ID_data[ID_data["ID_Mode"] == "Total_IDs"]
-            #find out present categories
+
+            
+            # Find out present categories
+            # Differs
             categories = plot_options["color_order"]
+            
+            
             # create the plot
             fig_data = []
             i = 0
             for eachCategory in categories:
-                fig_data.append(go.Bar(name = eachCategory,
-                            x=ID_data.loc[ID_data[plot_options["Group By Color"]]==eachCategory,plot_options["Group By X"]].tolist(),
-                            y=ID_data.loc[ID_data[plot_options["Group By Color"]]==eachCategory,"IDs"].tolist(),
-                            marker_color = plot_options["color"][i],
-                            text = [round(x) for x in ID_data.loc[ID_data[plot_options["Group By Color"]]==eachCategory,"IDs"].tolist()],
-                            error_y=dict(
-                                type = "data",
-                                array = ID_data.loc[ID_data[plot_options["Group By Color"]]==eachCategory,error_bars].tolist(),
-                                visible = error_visibile
-                            )))
+                fig_data.append(go.Bar(
+                    name = eachCategory,
+                    x=ID_data.loc[ID_data[plot_options["Group By Color"]]==eachCategory,plot_options["Group By X"]].tolist(),
+                    y=ID_data.loc[ID_data[plot_options["Group By Color"]]==eachCategory,"IDs"].tolist(),
+                    marker_color = plot_options["color"][i],
+                    text = [round(x) for x in ID_data.loc[ID_data[plot_options["Group By Color"]]==eachCategory,"IDs"].tolist()],
+                    error_y=dict(
+                        type = "data",
+                        array = ID_data.loc[ID_data[plot_options["Group By Color"]]==eachCategory,error_bars].tolist(),
+                        visible = error_visibile
+                    )))
                 i = i + 1                    
 
             fig = go.Figure(data = fig_data,
-                            layout=go.Layout(yaxis_title=plot_options["Y Title"],
+                            layout=go.Layout(
+                            yaxis_title=plot_options["Y Title"],
                             xaxis_title=plot_options["Group By X"],
-                            barmode="group",paper_bgcolor="rgba(255,255,255,255)",
+                            barmode="group",
+                            paper_bgcolor="rgba(255,255,255,255)",
                             plot_bgcolor="rgba(255, 255, 255, 255)",
                             yaxis=dict(showline=True, linewidth=1, linecolor='black'),
                             xaxis=dict(showline=True, linewidth=1, linecolor='black')))
@@ -720,6 +732,7 @@ class SCP_plotter:
         elif plot_options["ID mode"] == "stacked":
             # plot options
             # error bar
+            # Same as grouped
             if plot_options["error bar"] == "stdev":
                 error_bars = "stdev"
                 error_visibile = True
@@ -730,27 +743,42 @@ class SCP_plotter:
                 error_bars = "stdev"
                 error_visibile = False
 
+
             # mean label
-            if plot_options["mean label"] == "True" or \
-                    plot_options["mean label"] == True:
+            # Same as grouped
+            if plot_options["mean label"] == "True" or plot_options["mean label"] == True:
                 total_labels = [{"x": x, "y": total*1.15, "text": str(
                     int(total)), "showarrow": False} for x, total in zip(
                         ID_data["Conditions"], ID_data["IDs"])]
             else:
                 total_labels = []   # no mean labels
+
+
+            # ID_data
+            # Different than grouped
             if plot_options["Group By X"] == "ID_Mode" or plot_options["Group By Stack"] == "ID_Mode":  # total separated
                 ID_data = ID_data[ID_data["ID_Mode"] != "Total_IDs"]
             else:
                 ID_data = ID_data[ID_data["ID_Mode"] == "Total_IDs"]
 
+
+            # Layers
+            # Not in grouped
             if plot_options["Group By Stack"] == "ID_Mode":
                 layers = ["MS2_IDs", "MBR_IDs"]
             else:
                 layers = ID_data.groupby(plot_options["Group By Stack"]).first().reset_index()[plot_options["Group By Stack"]].tolist()
+            
+
+            # Create the plot
             fig_data = []
             last_layer = None
             i = 0
+
+
+            # Grouped has "group by color" and "eachCategory in categories" instead
             for eachLayer in layers: 
+                print(last_layer)
                 if last_layer == None:
                     fig_data.append(go.Bar(
                         name = eachLayer,
@@ -764,6 +792,8 @@ class SCP_plotter:
                             visible = error_visibile
                         )
                     ))
+
+                    # Not in grouped
                     bases = ID_data.loc[(ID_data[plot_options["Group By Stack"]]==eachLayer),"IDs"]
                     i = i + 1
                     
@@ -772,9 +802,9 @@ class SCP_plotter:
                         name = eachLayer,
                         x = ID_data.loc[(ID_data[plot_options["Group By Stack"]]==eachLayer),plot_options["Group By X"]].tolist(),
                         y = ID_data.loc[(ID_data[plot_options["Group By Stack"]]==eachLayer),"IDs"].tolist(),
-                        base=bases,
+                        base=bases,    # different than above
                         marker_color = plot_options["color"][i],
-                        opacity=0.5,
+                        opacity=0.5,   # different than above
                         text = [round(x) for x in bases + ID_data.loc[(ID_data[plot_options["Group By Stack"]]==eachLayer),"IDs"].tolist()],
                         error_y= dict(
                             type = "data",
@@ -782,24 +812,30 @@ class SCP_plotter:
                             visible = error_visibile
                         )
                     ))
-                    print(bases)
+                    # Also not above
                     bases = bases + ID_data.loc[(ID_data[plot_options["Group By Stack"]]==eachLayer),"IDs"].tolist()
                 last_layer = eachLayer
+
+
             fig = go.Figure(
                     data = fig_data,
                     layout=go.Layout(
                     yaxis_title=plot_options["Y Title"],
                     xaxis_title=plot_options["Group By X"],
-                    barmode="stack", 
+                    barmode="stack",      # different than grouped
                     paper_bgcolor="rgba(255,255,255,255)",
                     plot_bgcolor="rgba(255, 255, 255, 255)",
                     yaxis=dict(showline=True, linewidth=1, linecolor='black'),
                     xaxis=dict(showline=True, linewidth=1, linecolor='black')
                 ))          
-            fig.update_xaxes(categoryorder='array', categoryarray = plot_options["x_axis_order"])            
+
+            fig.update_xaxes(categoryorder='array', categoryarray = plot_options["x_axis_order"])   
+
+        
         elif plot_options["ID mode"] == "grouped_stacked":
             # plot options
             # error bar
+            # Same as grouped
             if plot_options["error bar"] == "stdev":
                 error_bars = "stdev"
                 error_visibile = True
@@ -810,27 +846,36 @@ class SCP_plotter:
                 error_bars = "stdev"
                 error_visibile = False
 
+
             # mean label
-            if plot_options["mean label"] == "True" or \
-                    plot_options["mean label"] == True:
+            # Same as grouped
+            if plot_options["mean label"] == "True" or plot_options["mean label"] == True:
                 total_labels = [{"x": x, "y": total*1.15, "text": str(
                     int(total)), "showarrow": False} for x, total in zip(
                         ID_data["Conditions"], ID_data["IDs"])]
             else:
                 total_labels = []   # no mean labels
 
+
+            # ID_data
+            # Differs from grouped. Adds the group by stack option
             if plot_options["Group By X"] == "ID_Mode" or plot_options["Group By Color"] == "ID_Mode"or plot_options["Group By Stack"] == "ID_Mode":  # total separated
                 ID_data = ID_data[ID_data["ID_Mode"] != "Total_IDs"]
             else:
                 ID_data = ID_data[ID_data["ID_Mode"] == "Total_IDs"]
 
+
             #make data tidy
+            # Combination of grouped and stacked
             if plot_options["Group By Stack"] == "ID_Mode":
                 layers = ["MS2_IDs", "MBR_IDs"]
             else:
                 layers = ID_data.groupby(plot_options["Group By Stack"]).first().reset_index()[plot_options["Group By Stack"]].tolist()
             categories = plot_options["color_order"]
             
+
+            # Create the plot
+            # Combination of grouped and stacked
             fig_data = []
             i = 0
             for eachCategory in categories:
@@ -872,19 +917,20 @@ class SCP_plotter:
                     j = j + 1
                 i = i + 1
 
-            fig = go.Figure(
-                fig_data,
-                layout=go.Layout(
-                    yaxis_title=plot_options["Y Title"],
-                    xaxis_title=plot_options["Group By X"],
-                    barmode="group",
-                    plot_bgcolor="rgba(255, 255, 255, 255)",
-                    paper_bgcolor="rgba(255, 255, 255, 255)",
-                    yaxis=dict(showline=True, linewidth=1, linecolor='black'),
-                    xaxis=dict(showline=True, linewidth=1, linecolor='black')
-                )
-            )
+            # Same as grouped
+            fig = go.Figure(fig_data,
+                                layout=go.Layout(
+                                    yaxis_title=plot_options["Y Title"],
+                                    xaxis_title=plot_options["Group By X"],
+                                    barmode="group",
+                                    plot_bgcolor="rgba(255, 255, 255, 255)",
+                                    paper_bgcolor="rgba(255, 255, 255, 255)",
+                                    yaxis=dict(showline=True, linewidth=1, linecolor='black'),
+                                    xaxis=dict(showline=True, linewidth=1, linecolor='black')
+                                )
+                            )
             fig.update_xaxes(categoryorder='array', categoryarray = plot_options["x_axis_order"])
+        
         else:
 
             # plot options
@@ -897,8 +943,7 @@ class SCP_plotter:
                 error_bars = None
 
             # mean label
-            if plot_options["mean label"] == "True" or \
-                    plot_options["mean label"] == True:
+            if plot_options["mean label"] == "True" or plot_options["mean label"] == True:
                 total_labels = [{"x": x, "y": total*1.15, "text": str(
                     int(total)), "showarrow": False} for x, total in zip(
                         ID_data["Conditions"], ID_data["IDs"])]
@@ -925,7 +970,10 @@ class SCP_plotter:
                             xaxis=dict(showline=True, linewidth=1, linecolor='black')
                             )
             fig.update_xaxes(categoryorder='array', categoryarray = plot_options["x_axis_order"])
+        
+        
         return fig
+
 
     def Missing_Values_Plots(self, data_object, plot_options, saved_settings, username=None):
         """_Prepare data for creating protein peptide identification bar
@@ -1082,6 +1130,7 @@ class SCP_plotter:
             CSV_link = None
             SVG_link = None
         return fig, CSV_link, SVG_link
+
 
     def plot_MissVal_plotly(self, ID_data,
                             username=None,
@@ -1343,9 +1392,13 @@ class SCP_plotter:
         else:
             x_axis_order = saved_settings["Order@"+plot_options["Group By X"]]
         plot_options["x_axis_order"] = x_axis_order
+
+
         if plot_options["CV mode"] == "grouped" or plot_options["CV mode"] == "grouped_stacked" and plot_options["Group By Color"] != "ID_Mode":
             color_order = saved_settings["Order@"+plot_options["Group By Color"]]
             plot_options["color_order"] = color_order
+
+
         # filter runs into different groups
         i = 1
         runname_list = []  # contain list of run names list for each groups
@@ -1723,6 +1776,7 @@ class SCP_plotter:
         
         return fig, SVG_link, CSV_link
 
+
     def venn_to_plotly(self, L_sets,
                     L_labels=None,
                     plot_options=None,
@@ -1865,7 +1919,8 @@ class SCP_plotter:
         
 
         return fig
-    
+
+
     def venns_plots(self, data_object, plot_options, saved_settings, username=None, miss_val_thresh=33):
         """_Prepare data for creating ID veens plots (up to three groups)_
         """
@@ -1968,6 +2023,7 @@ class SCP_plotter:
                 i = i + 1
         
         return fig, SVG_link, CSV_link
+
 
     def venn_to_plotly(self, L_sets,
                     L_labels=None,
@@ -2112,7 +2168,6 @@ class SCP_plotter:
 
         return fig
     
-
     # ###HYE plots####
     def HYE_plots(self, data_object,  plot_options, saved_settings, username=None, is_protein=False, missing_value_thresh=33):
         """_Prepare data for creating intensity volcano plots (two groups)_
@@ -2359,6 +2414,7 @@ class SCP_plotter:
 
         
         return fig, box
+    
     # ###Ranked Abundance Plot####
     def Rank_Abundance_Plots(self, data_object,  plot_options, saved_settings, username=None):
         """_Prepare data for creating intensity volcano plots (two groups)_
@@ -2507,7 +2563,6 @@ class SCP_plotter:
         
         return fig
     
-
     # ###Volcano plots####
     def volcano_plots(self,data_object,  plot_options, saved_settings, username=None, missing_values_max=33):
         """_Prepare data for creating intensity volcano plots (two groups)_
@@ -2776,7 +2831,6 @@ class SCP_plotter:
         
         return fig
 
-
     # ###PCA plots####
     def PCA_plots(self, data_object, plot_options, saved_settings,username=None, is_protein=False, missing_value_thresh=33):
         """_Prepare data for creating intensity PCA plots (two groups)_
@@ -2971,7 +3025,6 @@ class SCP_plotter:
         return fig, CSV_link, SVG_link
 
     
-    
     def GRAVY_Boxplot(self,data_obj, plot_options, saved_settings, settings_file, username = None):
         settings_table = pd.read_table(settings_file,sep="\t")
         all_gravy = pd.DataFrame({"Sequence":[],"Conditions":[]})
@@ -2996,6 +3049,7 @@ class SCP_plotter:
 
         
         return self.plot_GRAVY_boxplots(all_gravy, plot_options, settings_table, username)
+
 
     def plot_GRAVY_boxplots(self, gravies, plot_options, settings, username):
         
@@ -3114,6 +3168,7 @@ class SCP_plotter:
                 f"{username}_Intensity_boxplot.png"
 
         return fig, CSV_link, png_link
+    
     
     def heatmap_plots(self, data_object, plot_options, saved_settings, username=None, missing_value_thresh=33):
         group_names = []
@@ -3342,3 +3397,5 @@ class SCP_plotter:
         CSV_link = None
         SVG_link = None
         return figure, CSV_link, SVG_link 
+    
+    
