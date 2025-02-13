@@ -4,3 +4,5 @@ images/*
 __pycache__/*
 .vscode/*
 data_obj/*
+*.xlsx
+*.txt
