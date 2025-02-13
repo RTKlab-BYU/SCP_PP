@@ -1979,10 +1979,10 @@ class SCP_plotter:
                 print("method needs to be 'MS2' or 'Total'.")
                 raise TypeError("method needs to be 'MS2' or 'Total'.")
             
-            if "Hela" in eachGroup:
-                current_condition_data["peptide_ID_matrix"].to_csv("data_obj/Hela_ID_Matrix_mod.tsv", sep='\t')
-            else:
-                current_condition_data["peptide_ID_matrix"].to_csv("data_obj/K562_ID_Matrix_mod.tsv", sep='\t')
+            # if "Hela" in eachGroup:
+            #     current_condition_data["peptide_ID_matrix"].to_csv("data_obj/Hela_ID_Matrix_mod.tsv", sep='\t')
+            # else:
+            #     current_condition_data["peptide_ID_matrix"].to_csv("data_obj/K562_ID_Matrix_mod.tsv", sep='\t')
 
 
             data_set.append(

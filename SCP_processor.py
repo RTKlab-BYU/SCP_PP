@@ -528,6 +528,8 @@ class SCP_processor:
                 # Create a list of columns, but ignore the "Annotated Sequence" column
                 cols = [col for col in pep_ID.columns if col != 'Annotated Sequence' and col != "Precursor.Charge"]
 
+                print(pep_ID.head(20))
+
                 # For all of the columns
                 for col in cols:
                     # If the column is not an "object" type (if it is not a string)
@@ -921,6 +923,7 @@ class SCP_processor:
             return_matrix['peptide_abundance']=  pep_abundance
             return_matrix['peptide_ID_matrix']=  pep_ID
             return_matrix['peptide_ID_Summary']=  peptide_ID_summary
+            peptide_ID_summary.to_csv("data_obj/pep_ID_summary.tsv", sep="\t")
 
         if self.ignore_proteins is False:
             protein_ID_summary = self.sumIDs(prot_ID)
@@ -1213,12 +1216,13 @@ class SCP_processor:
         # the threshold, pep_columns contains the remaining protein/peptide
         # in a pandas dataframe with $names as its column name
 
+        # replace "nan" to np.nan
+        protein_columns = protein_columns.replace({"nan": np.nan}) 
+
         # For each column associated with the group name (ex Helalib) except Accession/Annotated Sequence
         for each_column in data_object[matrix_name].loc[
                 :, ~data_object[matrix_name].columns.str.contains(
                     name)].columns:
-            # replace "nan" to np.nan
-            protein_columns = protein_columns.replace({"nan": np.nan}) 
 
             #find missing values and increment those rows (a row is a protein/peptide) total number of missing values
             protein_columns.loc[(protein_columns[each_column] != "MS2")
@@ -1307,12 +1311,14 @@ class SCP_processor:
         protein_columns["missingValues"] = 0
         # print(data_object[matrix_name].shape)
         i = 0
+
+        # replace "nan" to np.nan
+        protein_columns = protein_columns.replace({"nan": np.nan}) 
         # found all the proteins/peptides with missing values rate below
         # the threshold, pep_columns contains the remaining protein/peptide
         # in a pandas dataframe with $names as its column name
         for each_column in data_object[matrix_name].loc[:, ~data_object[matrix_name].columns.str.contains(name)].columns:
-            # replace "nan" to np.nan
-            protein_columns = protein_columns.replace({"nan": np.nan}) 
+            
             protein_columns.loc[protein_columns[each_column] != "MS2", #ID/MBR are still missing values if you are only considering MS2
                                 "missingValues"] += 1
 
