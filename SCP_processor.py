@@ -1698,6 +1698,37 @@ class SCP_processor:
                 data_dict["protein_ID_Summary"]["names"].isin(
                     run_id_list)]
         return filtered_data
+    
+
+    def filter_outliers_cv(self, cv_data):
+        """ Takes calculated CV data and filters out the outliers. Uses 
+        Q1-(1.5)IQR as lower bound and Q3+(1.5)IQR as an upper bound
+
+        Parameters:
+            cv_data (DataFrame): CV data with columns:
+            - "Accession" (or "Annotated Sequence")
+            - "Intensity"
+            - "stdev"
+            - "CV"
+            - "Conditions"
+
+        Returns:
+            filtered_data (DataFrame): cv_data with the outliers filtered out
+        """
+        # Find the 1st and 3rd quartile on the CV column
+        Q1 = cv_data["CV"].quantile(.25)
+        Q3 = cv_data["CV"].quantile(.75)
+
+        # Calculate the bounds
+        IQR = Q3 - Q1
+        upper_bound = Q3 + (1.5) * IQR
+        lower_bound = Q1 - (1.5) * IQR
+
+        # Filter the data
+        filtered_cv = cv_data[cv_data['CV'].between(lower_bound, upper_bound)]
+        return filtered_cv
+
+
         
 
 # def filter_by_name(self,data_dict, runname_list):

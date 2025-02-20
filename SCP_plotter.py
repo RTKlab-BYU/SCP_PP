@@ -1490,6 +1490,8 @@ class SCP_plotter:
             for eachGroup in group_names:
                 all_cvs.loc[all_cvs["Conditions"]==eachGroup,eachCategory] = saved_settings[eachGroup][eachCategory]
 
+        # Filter out the outliers
+        all_cvs = self.processor.filter_outliers_cv(all_cvs)
 
         # ######################all_CVs format###################
     #      Accession     intensity          stdev          CV   Conditions
