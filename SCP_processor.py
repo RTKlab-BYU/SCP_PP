@@ -1365,6 +1365,138 @@ class SCP_processor:
         # print(data_object[matrix_name])
         
         return data_object
+    
+    def normalize_to_median_blocked(self, abundance_data, run_meta_data, num_blocks, apply_log2=False):
+        """ Normalize to median the abundance data in the following order.
+        For each block:
+            - normalize to median in channel 1
+            - normalize to median in channel 2
+            - normalize to median in the whole block
+        Finally, normalize to median across all blocks
+
+        Parameters:
+            abundance_data (DataFrame): A pandas data frame with the abundance data
+            run_meta_data (DataFrame): A pandas data frame with the mapping from id to name
+            num_blocks (int): The largest block number used
+            apply_log2 (bool): Determines if you wish to use the log2 version
+
+        Returns:
+            abundance (DataFrame): pandas DataFrame with the normalized data
+
+        """
+        abundance_data.replace(0, np.nan)
+
+        # For every block number, do the following
+        for i in range(1, num_blocks + 1):
+
+            # Create the strings to match
+            string_to_match_channel1 = r"blo{}\w*ch1".format(i)
+            string_to_match_channel2 = r"blo{}\w*ch2".format(i)
+
+            # Get the column names that match the block number
+            run_names = run_meta_data["Run Names"]
+            channel1_col_names = [run_name for run_name in run_names if 
+                                  re.search(string_to_match_channel1, run_name)]
+            channel2_col_names = [run_name for run_name in run_names if 
+                                  re.search(string_to_match_channel2, run_name)]
+            
+            # Get the corresponding id numbers
+            channel1_col_ids = run_meta_data.loc[run_meta_data["Run Names"].isin(channel1_col_names), 
+                                                 "Run Identifier"].to_list()
+            channel2_col_ids = run_meta_data.loc[run_meta_data["Run Names"].isin(channel2_col_names), 
+                                                 "Run Identifier"].to_list()
+            block_ids = channel1_col_ids + channel2_col_ids
+            
+            # Continue if the block is not used
+            if len(channel1_col_ids) == 0 and len(channel2_col_ids) == 0:
+                continue
+
+            # Get the median for each channel
+            channel1_data = abundance_data[channel1_col_ids].values
+            channel2_data = abundance_data[channel2_col_ids].values
+            median_channel1 = np.nanmedian(channel1_data)
+            median_channel2 = np.nanmedian(channel2_data)
+
+            # Channel 1
+            # normalize all median, all median/current run all protein median
+            # apply log2 to all the values if apply_log2 is True
+            if apply_log2:    
+                for each_column in channel1_col_ids:
+                    place_holder = np.log2(np.nanmedian(abundance_data[each_column]))
+                    abundance_data[each_column] = (
+                        np.log2(median_channel1) * np.log2(abundance_data[each_column]) / place_holder)
+            else:
+                for each_column in channel1_col_ids:
+                    abundance_data[each_column] = (
+                        median_channel1 * abundance_data[each_column] /
+                        np.nanmedian(abundance_data[each_column]))
+
+            # Channel 2
+            # normalize all median, all median/current run all protein median
+            # apply log2 to all the values if apply_log2 is True
+            if apply_log2:    
+                for each_column in channel2_col_ids:
+                    place_holder = np.log2(np.nanmedian(abundance_data[each_column]))
+                    abundance_data[each_column] = (
+                        np.log2(median_channel2) * np.log2(abundance_data[each_column]) / place_holder)
+            else:
+                for each_column in channel2_col_ids:
+                    abundance_data[each_column] = (
+                        median_channel2 * abundance_data[each_column] /
+                        np.nanmedian(abundance_data[each_column]))
+                    
+            #TODO divide by zero error encountered in log2, temporarily set to 0
+            abundance_data = abundance_data.replace([np.inf, -np.inf], 0)
+
+            # Normalize throughout the block
+            block1_data = abundance_data[block_ids].values
+            median_block = np.nanmedian(block1_data)
+
+            # Block i
+            # normalize all median, all median/current run all protein median
+            # apply log2 to all the values if apply_log2 is True
+            if apply_log2:    
+                for each_column in block_ids:
+                    place_holder = np.log2(np.nanmedian(abundance_data[each_column]))
+                    abundance_data[each_column] = (
+                        np.log2(median_block) * np.log2(abundance_data[each_column]) / place_holder)
+            else:
+                for each_column in block_ids:
+                    abundance_data[each_column] = (
+                        median_block * abundance_data[each_column] /
+                        np.nanmedian(abundance_data[each_column]))
+                    
+            #TODO divide by zero error encountered in log2, temporarily set to 0
+            abundance_data = abundance_data.replace([np.inf, -np.inf], 0)
+
+        print("Normalized between each block...")
+
+        all_ids = run_meta_data["Run Identifier"].to_list()
+
+        # Normalize throughout the block
+        all_block_data = abundance_data[all_ids].values
+        median_of_all = np.nanmedian(all_block_data)
+
+        # All data
+        # normalize all median, all median/current run all protein median
+        # apply log2 to all the values if apply_log2 is True
+        if apply_log2:    
+            for each_column in all_ids:
+                place_holder = np.log2(np.nanmedian(abundance_data[each_column]))
+                abundance_data[each_column] = (
+                    np.log2(median_of_all) * np.log2(abundance_data[each_column]) / place_holder)
+        else:
+            for each_column in all_ids:
+                abundance_data[each_column] = (
+                    median_of_all * abundance_data[each_column] /
+                    np.nanmedian(abundance_data[each_column]))
+                
+        #TODO divide by zero error encountered in log2, temporarily set to 0
+        abundance_data = abundance_data.replace([np.inf, -np.inf], 0)
+
+        print("Normalized across all blocks...")
+
+        return abundance_data
 
 
     def NormalizeToMedian(self,abundance_data, apply_log2=False):
@@ -1382,10 +1514,13 @@ class SCP_processor:
             'abundances':        Accession  3_TrypsinLysConly_3A4_channel2
             A0A096LP49                    0.000000e+00
         """
+        abundance_data.to_csv("data_obj/normalized_data.tsv", sep='\t')
+
         # all the columns/sample list
         columns = [col for col in abundance_data.select_dtypes(include=[
                 np.number])]
         data_matrix = abundance_data[columns].values
+
         # replace 0 with nan
         data_matrix[data_matrix == 0] = np.nan
         medianOfAll = np.nanmedian(data_matrix)
