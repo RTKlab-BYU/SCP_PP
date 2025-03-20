@@ -528,8 +528,6 @@ class SCP_processor:
                 # Create a list of columns, but ignore the "Annotated Sequence" column
                 cols = [col for col in pep_ID.columns if col != 'Annotated Sequence' and col != "Precursor.Charge"]
 
-                print(pep_ID.head(20))
-
                 # For all of the columns
                 for col in cols:
                     # If the column is not an "object" type (if it is not a string)
